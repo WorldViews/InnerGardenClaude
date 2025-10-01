@@ -1,0 +1,636 @@
+// Complete Garden Journal View functionality
+const CompleteJournalPage = {
+    allEntries: [],
+    filteredEntries: [],
+    currentFilter: 'all',
+    currentSort: 'date-desc',
+
+    init() {
+        this.render();
+        this.loadAllEntries();
+        this.setupEventListeners();
+    },
+
+    render() {
+        const container = document.getElementById('complete-journal-page');
+        container.innerHTML = `
+            <div class="page-header">
+                <button class="back-btn" onclick="goHome()">
+                    <i class="fas fa-arrow-left"></i> Back to Garden
+                </button>
+                <h1><i class="fas fa-book-open"></i> Complete Garden Journal</h1>
+                <p>Your complete personal growth journey in one organized view</p>
+            </div>
+
+            <div class="journal-container">
+                <!-- Export Section -->
+                <div class="export-section" style="background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px;"><i class="fas fa-file-export"></i> Export Your Journal</h3>
+                    <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
+                        <button onclick="CompleteJournalPage.exportToPDF()" 
+                                style="background: #e74c3c; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-file-pdf"></i> Export to PDF
+                        </button>
+                        <button onclick="CompleteJournalPage.exportToRTF()" 
+                                style="background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-file-word"></i> Export to RTF
+                        </button>
+                        <button onclick="CompleteJournalPage.exportToHTML()" 
+                                style="background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-code"></i> Export to HTML
+                        </button>
+                    </div>
+                    <div style="display: flex; gap: 10px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="include-insights" checked>
+                            Include insights & analysis
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 5px;">
+                            <input type="checkbox" id="include-stats" checked>
+                            Include statistics
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Filters and Controls -->
+                <div class="journal-controls" style="background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Filter by Type:</label>
+                            <select id="entry-filter" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                                <option value="all">All Entries</option>
+                                <option value="daily-logs">Daily Logs</option>
+                                <option value="goals">Goals & Seeds</option>
+                                <option value="gratitude">Gratitude</option>
+                                <option value="wisdom">Wisdom Entries</option>
+                                <option value="observations">Observations</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Sort by:</label>
+                            <select id="entry-sort" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                                <option value="date-desc">Newest First</option>
+                                <option value="date-asc">Oldest First</option>
+                                <option value="type">By Type</option>
+                                <option value="content">By Content Length</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">Date Range:</label>
+                            <input type="date" id="date-from" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                        </div>
+                        <div>
+                            <label style="display: block; margin-bottom: 5px; font-weight: bold;">To:</label>
+                            <input type="date" id="date-to" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                        </div>
+                    </div>
+                    <div style="text-align: center;">
+                        <button onclick="CompleteJournalPage.applyFilters()" 
+                                style="background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-right: 10px;">
+                            <i class="fas fa-filter"></i> Apply Filters
+                        </button>
+                        <button onclick="CompleteJournalPage.clearFilters()" 
+                                style="background: #95a5a6; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Summary Statistics -->
+                <div id="journal-summary" class="journal-summary"></div>
+
+                <!-- Entries List -->
+                <div id="journal-entries" class="journal-entries"></div>
+            </div>
+        `;
+    },
+
+    setupEventListeners() {
+        document.getElementById('entry-filter').addEventListener('change', () => this.applyFilters());
+        document.getElementById('entry-sort').addEventListener('change', () => this.applyFilters());
+    },
+
+    loadAllEntries() {
+        if (!window.gardenStorage) return;
+
+        this.allEntries = [];
+
+        // Load daily logs
+        const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
+        Object.entries(dailyLogs).forEach(([date, log]) => {
+            // Main daily log entry
+            this.allEntries.push({
+                id: `daily-${date}`,
+                type: 'daily-logs',
+                date: date,
+                timestamp: log.timestamp || new Date(date).toISOString(),
+                title: `Daily Log - ${new Date(date).toLocaleDateString()}`,
+                content: this.formatDailyLogContent(log),
+                rawData: log,
+                mood: log.moodRating,
+                weather: log.weatherTags || []
+            });
+
+            // Individual seeds/goals
+            if (log.seeds && log.seeds.length > 0) {
+                log.seeds.forEach((seed, index) => {
+                    this.allEntries.push({
+                        id: `seed-${date}-${index}`,
+                        type: 'goals',
+                        date: date,
+                        timestamp: seed.timestamp || log.timestamp || new Date(date).toISOString(),
+                        title: `Goal/Intention`,
+                        content: seed.text,
+                        rawData: seed,
+                        parentLog: date
+                    });
+                });
+            }
+
+            // Individual gratitude entries
+            if (log.gratitude && log.gratitude.length > 0) {
+                log.gratitude.forEach((gratitude, index) => {
+                    this.allEntries.push({
+                        id: `gratitude-${date}-${index}`,
+                        type: 'gratitude',
+                        date: date,
+                        timestamp: gratitude.timestamp || log.timestamp || new Date(date).toISOString(),
+                        title: `Gratitude`,
+                        content: gratitude.text,
+                        rawData: gratitude,
+                        parentLog: date
+                    });
+                });
+            }
+
+            // Observations
+            if (log.observations && log.observations.trim()) {
+                this.allEntries.push({
+                    id: `observation-${date}`,
+                    type: 'observations',
+                    date: date,
+                    timestamp: log.timestamp || new Date(date).toISOString(),
+                    title: `Growth Observations`,
+                    content: log.observations,
+                    rawData: { observations: log.observations },
+                    parentLog: date
+                });
+            }
+        });
+
+        // Load wisdom entries
+        const weedTracker = window.gardenStorage.getSection('weedTracker') || {};
+        Object.values(weedTracker).forEach((weed) => {
+            this.allEntries.push({
+                id: `wisdom-${weed.id}`,
+                type: 'wisdom',
+                date: weed.date,
+                timestamp: weed.timestamp,
+                title: `Wisdom Transformation`,
+                content: this.formatWisdomContent(weed),
+                rawData: weed,
+                improvement: (weed.beliefIntensity - weed.newBeliefIntensity) + (weed.emotionIntensity - weed.newEmotionIntensity)
+            });
+        });
+
+        this.filteredEntries = [...this.allEntries];
+        this.applyFilters();
+    },
+
+    formatDailyLogContent(log) {
+        let content = [];
+
+        if (log.moodRating) {
+            content.push(`Mood: ${log.moodRating}/10`);
+        }
+
+        if (log.weatherTags && log.weatherTags.length > 0) {
+            content.push(`Inner Weather: ${log.weatherTags.join(', ')}`);
+        }
+
+        if (log.activities) {
+            const completedActivities = Object.entries(log.activities)
+                .filter(([, data]) => data.completed)
+                .map(([activity, data]) => `${activity}${data.duration ? ` (${data.duration}min)` : ''}`);
+            if (completedActivities.length > 0) {
+                content.push(`Activities: ${completedActivities.join(', ')}`);
+            }
+        }
+
+        if (log.seeds && log.seeds.length > 0) {
+            content.push(`Seeds planted: ${log.seeds.length}`);
+        }
+
+        if (log.gratitude && log.gratitude.length > 0) {
+            content.push(`Gratitude entries: ${log.gratitude.length}`);
+        }
+
+        if (log.observations) {
+            content.push(`Observations: ${log.observations}`);
+        }
+
+        return content.join('\n');
+    },
+
+    formatWisdomContent(weed) {
+        return `Situation: ${weed.situation}
+
+Original Thought: "${weed.originalThought}"
+Belief Intensity: ${weed.beliefIntensity}%
+
+Balanced Thought: "${weed.balancedThought}"
+New Belief Intensity: ${weed.newBeliefIntensity}%
+
+Emotions: ${weed.emotions.join(', ')}
+Emotional Intensity: ${weed.emotionIntensity} → ${weed.newEmotionIntensity}
+
+${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
+    },
+
+    applyFilters() {
+        const filter = document.getElementById('entry-filter').value;
+        const sort = document.getElementById('entry-sort').value;
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+
+        this.currentFilter = filter;
+        this.currentSort = sort;
+
+        // Filter by type
+        this.filteredEntries = this.allEntries.filter(entry => {
+            if (filter !== 'all' && entry.type !== filter) return false;
+
+            // Date range filter
+            if (dateFrom && entry.date < dateFrom) return false;
+            if (dateTo && entry.date > dateTo) return false;
+
+            return true;
+        });
+
+        // Sort entries
+        this.filteredEntries.sort((a, b) => {
+            switch (sort) {
+                case 'date-desc':
+                    return new Date(b.timestamp) - new Date(a.timestamp);
+                case 'date-asc':
+                    return new Date(a.timestamp) - new Date(b.timestamp);
+                case 'type':
+                    return a.type.localeCompare(b.type) || new Date(b.timestamp) - new Date(a.timestamp);
+                case 'content':
+                    return b.content.length - a.content.length;
+                default:
+                    return 0;
+            }
+        });
+
+        this.renderSummary();
+        this.renderEntries();
+    },
+
+    clearFilters() {
+        document.getElementById('entry-filter').value = 'all';
+        document.getElementById('entry-sort').value = 'date-desc';
+        document.getElementById('date-from').value = '';
+        document.getElementById('date-to').value = '';
+        this.applyFilters();
+    },
+
+    renderSummary() {
+        const total = this.filteredEntries.length;
+        const byType = {};
+        let totalWords = 0;
+
+        this.filteredEntries.forEach(entry => {
+            byType[entry.type] = (byType[entry.type] || 0) + 1;
+            totalWords += entry.content.split(/\s+/).length;
+        });
+
+        const typeLabels = {
+            'daily-logs': 'Daily Logs',
+            'goals': 'Goals & Seeds',
+            'gratitude': 'Gratitude',
+            'wisdom': 'Wisdom Entries',
+            'observations': 'Observations'
+        };
+
+        const summaryHtml = `
+            <div class="journal-summary" style="background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                <h3 style="color: #2c3e50; margin-bottom: 15px;"><i class="fas fa-chart-bar"></i> Journal Summary</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 15px;">
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #3498db;">${total}</div>
+                        <div style="color: #7f8c8d;">Total Entries</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #27ae60;">${totalWords.toLocaleString()}</div>
+                        <div style="color: #7f8c8d;">Total Words</div>
+                    </div>
+                    <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <div style="font-size: 2rem; font-weight: bold; color: #e74c3c;">${Object.keys(byType).length}</div>
+                        <div style="color: #7f8c8d;">Entry Types</div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;">
+                    ${Object.entries(byType).map(([type, count]) => `
+                        <div style="text-align: center; padding: 10px; background: #ecf0f1; border-radius: 8px;">
+                            <div style="font-weight: bold; color: #2c3e50;">${count}</div>
+                            <div style="font-size: 0.8rem; color: #7f8c8d;">${typeLabels[type] || type}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        document.getElementById('journal-summary').innerHTML = summaryHtml;
+    },
+
+    renderEntries() {
+        const entriesHtml = this.filteredEntries.map(entry => this.renderEntry(entry)).join('');
+
+        document.getElementById('journal-entries').innerHTML = `
+            <div style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                <h3 style="color: #2c3e50; margin-bottom: 20px;">
+                    <i class="fas fa-list"></i> Journal Entries 
+                    <span style="font-size: 0.8rem; color: #7f8c8d;">(${this.filteredEntries.length} entries)</span>
+                </h3>
+                ${entriesHtml || '<p style="text-align: center; color: #7f8c8d; padding: 40px;">No entries found matching your filters.</p>'}
+            </div>
+        `;
+    },
+
+    renderEntry(entry) {
+        const typeIcons = {
+            'daily-logs': 'calendar-day',
+            'goals': 'seedling',
+            'gratitude': 'heart',
+            'wisdom': 'brain',
+            'observations': 'eye'
+        };
+
+        const typeColors = {
+            'daily-logs': '#3498db',
+            'goals': '#27ae60',
+            'gratitude': '#e74c3c',
+            'wisdom': '#9b59b6',
+            'observations': '#f39c12'
+        };
+
+        const date = new Date(entry.timestamp).toLocaleDateString();
+        const time = new Date(entry.timestamp).toLocaleTimeString();
+
+        return `
+            <div style="border-left: 4px solid ${typeColors[entry.type]}; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 0 8px 8px 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-${typeIcons[entry.type]}" style="color: ${typeColors[entry.type]};"></i>
+                        <h4 style="margin: 0; color: #2c3e50;">${entry.title}</h4>
+                    </div>
+                    <div style="text-align: right; font-size: 0.8rem; color: #7f8c8d;">
+                        <div>${date}</div>
+                        <div>${time}</div>
+                    </div>
+                </div>
+                <div style="white-space: pre-wrap; line-height: 1.6; color: #333;">
+                    ${entry.content}
+                </div>
+                ${entry.mood ? `<div style="margin-top: 10px; font-size: 0.9rem; color: #7f8c8d;">Mood: ${entry.mood}/10</div>` : ''}
+                ${entry.improvement ? `<div style="margin-top: 5px; font-size: 0.9rem; color: #7f8c8d;">Growth Score: ${entry.improvement.toFixed(1)}</div>` : ''}
+            </div>
+        `;
+    },
+
+    exportToPDF() {
+        window.showNotification('🔄 Generating PDF...', 'info');
+
+        // Use jsPDF library for PDF generation
+        this.loadjsPDF().then(() => {
+            const { jsPDF } = window;
+            const pdf = new jsPDF();
+
+            this.generatePDFContent(pdf);
+
+            const filename = `inner-garden-journal-${new Date().toISOString().split('T')[0]}.pdf`;
+            pdf.save(filename);
+
+            window.showNotification('📄 PDF journal exported successfully!');
+        }).catch(error => {
+            console.error('Error loading jsPDF:', error);
+            window.showNotification('❌ Error generating PDF. Falling back to HTML export.', 'error');
+            this.exportToHTML();
+        });
+    },
+
+    loadjsPDF() {
+        return new Promise((resolve, reject) => {
+            if (window.jsPDF) {
+                resolve();
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+            script.onload = resolve;
+            script.onerror = reject;
+            document.head.appendChild(script);
+        });
+    },
+
+    generatePDFContent(pdf) {
+        let yPosition = 20;
+        const pageHeight = pdf.internal.pageSize.height;
+        const pageWidth = pdf.internal.pageSize.width;
+        const margin = 20;
+        const lineHeight = 6;
+
+        // Title
+        pdf.setFontSize(20);
+        pdf.setFont(undefined, 'bold');
+        pdf.text('🌱 Inner Garden Journal', margin, yPosition);
+        yPosition += 15;
+
+        // Date range
+        pdf.setFontSize(12);
+        pdf.setFont(undefined, 'normal');
+        pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yPosition);
+        yPosition += 10;
+
+        if (this.filteredEntries.length > 0) {
+            const oldestEntry = this.filteredEntries[this.filteredEntries.length - 1];
+            const newestEntry = this.filteredEntries[0];
+            pdf.text(`Entries from: ${new Date(oldestEntry.timestamp).toLocaleDateString()} to ${new Date(newestEntry.timestamp).toLocaleDateString()}`, margin, yPosition);
+            yPosition += 15;
+        }
+
+        // Summary statistics
+        if (document.getElementById('include-stats').checked) {
+            pdf.setFont(undefined, 'bold');
+            pdf.text('Summary Statistics:', margin, yPosition);
+            yPosition += 8;
+
+            pdf.setFont(undefined, 'normal');
+            pdf.text(`Total Entries: ${this.filteredEntries.length}`, margin, yPosition);
+            yPosition += 6;
+
+            const totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
+            pdf.text(`Total Words: ${totalWords.toLocaleString()}`, margin, yPosition);
+            yPosition += 15;
+        }
+
+        // Entries
+        this.filteredEntries.forEach((entry, index) => {
+            // Check if we need a new page
+            if (yPosition > pageHeight - 50) {
+                pdf.addPage();
+                yPosition = 20;
+            }
+
+            // Entry header
+            pdf.setFont(undefined, 'bold');
+            pdf.setFontSize(14);
+            pdf.text(`${entry.title}`, margin, yPosition);
+            yPosition += 8;
+
+            pdf.setFont(undefined, 'normal');
+            pdf.setFontSize(10);
+            pdf.text(`${new Date(entry.timestamp).toLocaleDateString()} - ${entry.type}`, margin, yPosition);
+            yPosition += 8;
+
+            // Entry content
+            pdf.setFontSize(11);
+            const lines = pdf.splitTextToSize(entry.content, pageWidth - 2 * margin);
+            lines.forEach(line => {
+                if (yPosition > pageHeight - 20) {
+                    pdf.addPage();
+                    yPosition = 20;
+                }
+                pdf.text(line, margin, yPosition);
+                yPosition += lineHeight;
+            });
+
+            yPosition += 10; // Space between entries
+        });
+    },
+
+    exportToRTF() {
+        const rtfContent = this.generateRTFContent();
+        this.downloadFile(rtfContent, `inner-garden-journal-${new Date().toISOString().split('T')[0]}.rtf`, 'application/rtf');
+        window.showNotification('📝 RTF journal exported successfully!');
+    },
+
+    generateRTFContent() {
+        let rtf = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
+
+        // Title
+        rtf += '\\f0\\fs36\\b Inner Garden Journal\\b0\\fs24\\par\\par';
+
+        // Date
+        rtf += `Generated on: ${new Date().toLocaleDateString()}\\par\\par`;
+
+        // Summary
+        if (document.getElementById('include-stats').checked) {
+            rtf += '\\b Summary Statistics:\\b0\\par';
+            rtf += `Total Entries: ${this.filteredEntries.length}\\par`;
+            const totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
+            rtf += `Total Words: ${totalWords.toLocaleString()}\\par\\par`;
+        }
+
+        // Entries
+        this.filteredEntries.forEach(entry => {
+            rtf += '\\b\\fs28 ' + this.escapeRTF(entry.title) + '\\b0\\fs24\\par';
+            rtf += `${new Date(entry.timestamp).toLocaleDateString()} - ${entry.type}\\par`;
+            rtf += this.escapeRTF(entry.content) + '\\par\\par';
+        });
+
+        rtf += '}';
+        return rtf;
+    },
+
+    escapeRTF(text) {
+        return text.replace(/\\/g, '\\\\')
+            .replace(/\{/g, '\\{')
+            .replace(/\}/g, '\\}')
+            .replace(/\n/g, '\\par ');
+    },
+
+    exportToHTML() {
+        const htmlContent = this.generateHTMLContent();
+        this.downloadFile(htmlContent, `inner-garden-journal-${new Date().toISOString().split('T')[0]}.html`, 'text/html');
+        window.showNotification('🌐 HTML journal exported successfully!');
+    },
+
+    generateHTMLContent() {
+        const includeStats = document.getElementById('include-stats').checked;
+        const includeInsights = document.getElementById('include-insights').checked;
+
+        let html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inner Garden Journal</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .entry { margin-bottom: 30px; padding: 20px; border-left: 4px solid #3498db; background: #f8f9fa; }
+        .entry-title { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; }
+        .entry-meta { color: #666; font-size: 0.9em; margin-bottom: 15px; }
+        .entry-content { white-space: pre-wrap; }
+        .stats { background: #e8f4f8; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .type-daily-logs { border-left-color: #3498db; }
+        .type-goals { border-left-color: #27ae60; }
+        .type-gratitude { border-left-color: #e74c3c; }
+        .type-wisdom { border-left-color: #9b59b6; }
+        .type-observations { border-left-color: #f39c12; }
+    </style>
+</head>
+<body>`;
+
+        html += `<div class="header">
+            <h1>🌱 Inner Garden Journal</h1>
+            <p>Generated on: ${new Date().toLocaleDateString()}</p>
+        </div>`;
+
+        if (includeStats) {
+            const totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
+            html += `<div class="stats">
+                <h3>Summary Statistics</h3>
+                <p><strong>Total Entries:</strong> ${this.filteredEntries.length}</p>
+                <p><strong>Total Words:</strong> ${totalWords.toLocaleString()}</p>
+                <p><strong>Date Range:</strong> ${this.filteredEntries.length > 0 ?
+                    new Date(this.filteredEntries[this.filteredEntries.length - 1].timestamp).toLocaleDateString() +
+                    ' to ' +
+                    new Date(this.filteredEntries[0].timestamp).toLocaleDateString() : 'No entries'}</p>
+            </div>`;
+        }
+
+        this.filteredEntries.forEach(entry => {
+            html += `<div class="entry type-${entry.type}">
+                <div class="entry-title">${this.escapeHTML(entry.title)}</div>
+                <div class="entry-meta">${new Date(entry.timestamp).toLocaleDateString()} - ${entry.type}</div>
+                <div class="entry-content">${this.escapeHTML(entry.content)}</div>
+            </div>`;
+        });
+
+        html += '</body></html>';
+        return html;
+    },
+
+    escapeHTML(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    },
+
+    downloadFile(content, filename, mimeType) {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = filename;
+        link.click();
+        URL.revokeObjectURL(url);
+    }
+};
+
+// Make CompleteJournalPage available globally
+window.CompleteJournalPage = CompleteJournalPage;
