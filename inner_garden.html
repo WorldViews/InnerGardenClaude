@@ -871,30 +871,6 @@
                     <div class="stat-label">Wellness Score</div>
                 </div>
             </div>
-
-            <!-- Data Management Section -->
-            <div class="data-management" style="margin-top: 20px; text-align: center;">
-                <h4 style="color: #2c3e50; margin-bottom: 15px;">
-                    <i class="fas fa-database"></i> Garden Data Management
-                </h4>
-                <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                    <button onclick="downloadGardenData()"
-                        style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;"
-                        onmouseover="this.style.background='#229954'" onmouseout="this.style.background='#27ae60'">
-                        <i class="fas fa-download"></i>
-                        Export Garden Data
-                    </button>
-                    <button onclick="document.getElementById('import-file').click()"
-                        style="background: #f39c12; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 8px;"
-                        onmouseover="this.style.background='#e67e22'" onmouseout="this.style.background='#f39c12'">
-                        <i class="fas fa-upload"></i>
-                        Import Garden Data
-                    </button>
-                </div>
-                <p style="font-size: 0.8rem; color: #7f8c8d; margin-top: 10px;">
-                    Backup your garden progress or restore from a previous backup
-                </p>
-            </div>
         </div>
 
         <div class="navigation-grid">
@@ -950,6 +926,87 @@
                 <p>View your entire growth journey in one organized list. Export to PDF, RTF, or HTML formats.</p>
             </div>
         </div>
+
+        <!-- Garden Data Management Panel -->
+        <div class="data-management-panel"
+            style="background: rgba(255, 255, 255, 0.95); border-radius: 20px; padding: 30px; margin-top: 30px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h2 style="color: #2c3e50; margin-bottom: 10px;">
+                    <i class="fas fa-database"></i> Garden Data Management
+                </h2>
+                <p style="color: #7f8c8d; font-size: 1.1rem;">
+                    Backup, restore, and manage your personal growth data
+                </p>
+            </div>
+
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 25px;">
+                <!-- Export Section -->
+                <div
+                    style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                    <h3 style="color: #27ae60; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-download"></i> Export Your Garden
+                    </h3>
+                    <p style="color: #7f8c8d; margin-bottom: 20px; line-height: 1.6;">
+                        Download your complete garden data in multiple formats for backup or sharing.
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button onclick="downloadGardenData()"
+                            style="background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 1rem;"
+                            onmouseover="this.style.background='#229954'" onmouseout="this.style.background='#27ae60'">
+                            <i class="fas fa-file-code"></i>
+                            Export as JSON
+                        </button>
+                        <button onclick="downloadGardenDataYAML()"
+                            style="background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 1rem;"
+                            onmouseover="this.style.background='#2980b9'" onmouseout="this.style.background='#3498db'">
+                            <i class="fas fa-file-alt"></i>
+                            Export as YAML
+                        </button>
+                    </div>
+                    <div
+                        style="margin-top: 15px; padding: 10px; background: #e8f5e8; border-radius: 8px; font-size: 0.85rem; color: #27ae60;">
+                        <i class="fas fa-info-circle"></i>
+                        Includes all logs, wisdom entries, and growth statistics
+                    </div>
+                </div>
+
+                <!-- Import Section -->
+                <div
+                    style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                    <h3 style="color: #f39c12; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                        <i class="fas fa-upload"></i> Import Garden Data
+                    </h3>
+                    <p style="color: #7f8c8d; margin-bottom: 20px; line-height: 1.6;">
+                        Restore your garden from a previous backup or import data from another device.
+                    </p>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <button onclick="document.getElementById('import-file').click()"
+                            style="background: #f39c12; color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 1rem;"
+                            onmouseover="this.style.background='#e67e22'" onmouseout="this.style.background='#f39c12'">
+                            <i class="fas fa-file-import"></i>
+                            Import JSON File
+                        </button>
+                    </div>
+                    <div
+                        style="margin-top: 15px; padding: 10px; background: #fef9e7; border-radius: 8px; font-size: 0.85rem; color: #f39c12;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        Warning: This will replace all current data
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Statistics -->
+            <div
+                style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-top: 25px;">
+                <h3 style="color: #9b59b6; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fas fa-chart-bar"></i> Your Garden Statistics
+                </h3>
+                <div id="data-stats"
+                    style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center;">
+                    <!-- Stats will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
     </div>
 
     <div class="quick-actions">
@@ -975,7 +1032,8 @@
     </div>
 
     <!-- Hidden file input for importing garden data -->
-    <input type="file" id="import-file" class="import-file-input" accept=".json" onchange="importGardenData(event)">
+    <input type="file" id="import-file" class="import-file-input" accept=".json,.yaml,.yml"
+        onchange="importGardenData(event)">
 
     <!-- Page Content Containers (Initially Hidden) -->
     <div id="daily-log-page" class="current-page"></div>

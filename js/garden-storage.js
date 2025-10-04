@@ -148,7 +148,11 @@ class GardenStorage {
 
         if (recent.length === 0) return '--';
 
-        const totalMood = recent.reduce((sum, [, log]) => sum + (log.moodRating || 5), 0);
+        const totalMood = recent.reduce((sum, [, log]) => {
+            const moodRating = parseInt(log.moodRating) || 5;
+            return sum + moodRating;
+        }, 0);
+
         return Math.round((totalMood / recent.length) * 10) / 10;
     }
 

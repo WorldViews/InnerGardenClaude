@@ -108,12 +108,124 @@ window.downloadGardenData = function () {
         // Clean up
         URL.revokeObjectURL(url);
 
-        window.showNotification(`🌱 Garden data exported! ${dailyLogCount} logs, ${weedEntryCount} wisdom entries`);
+        window.showNotification(`🌱 Garden data exported as JSON! ${dailyLogCount} logs, ${weedEntryCount} wisdom entries`);
 
     } catch (error) {
         console.error('Error exporting garden data:', error);
         window.showNotification('❌ Error exporting garden data. Please try again.', 'error');
     }
+};
+
+window.downloadGardenDataYAML = function () {
+    try {
+        // Get all garden data from storage
+        const gardenData = window.gardenStorage.getData();
+
+        if (!gardenData) {
+            window.showNotification('❌ No garden data found to export.', 'error');
+            return;
+        }
+
+        // Calculate some summary stats for the export
+        const stats = window.gardenStorage.calculateGrowthStats();
+        const dailyLogCount = Object.keys(gardenData.dailyLogs || {}).length;
+        const weedEntryCount = Object.keys(gardenData.weedTracker || {}).length;
+
+        // Add export metadata
+        const exportData = {
+            ...gardenData,
+            exportInfo: {
+                exportDate: new Date().toISOString(),
+                version: '1.0',
+                appName: 'Inner Garden Tracker',
+                summary: {
+                    totalDailyLogs: dailyLogCount,
+                    totalWeedEntries: weedEntryCount,
+                    currentStreak: stats.streak,
+                    daysSinceStart: stats.daysSinceStart,
+                    wellnessScore: stats.wellnessScore
+                }
+            }
+        };
+
+        // Convert to YAML string
+        const yamlString = window.convertToYAML(exportData);
+
+        // Create blob and download
+        const blob = new Blob([yamlString], { type: 'application/x-yaml' });
+        const url = URL.createObjectURL(blob);
+
+        // Generate filename with timestamp
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = `inner-garden-backup-${timestamp}.yaml`;
+
+        // Trigger download
+        document.body.appendChild(downloadLink);
+        downloadLink.click();
+        document.body.removeChild(downloadLink);
+
+        // Clean up
+        URL.revokeObjectURL(url);
+
+        window.showNotification(`🌱 Garden data exported as YAML! ${dailyLogCount} logs, ${weedEntryCount} wisdom entries`);
+
+    } catch (error) {
+        console.error('Error exporting garden data as YAML:', error);
+        window.showNotification('❌ Error exporting garden data. Please try again.', 'error');
+    }
+};
+
+// Simple YAML converter function
+window.convertToYAML = function (obj, indent = 0) {
+    const spaces = '  '.repeat(indent);
+    let yaml = '';
+
+    if (obj === null) {
+        return 'null';
+    } else if (typeof obj === 'boolean') {
+        return obj.toString();
+    } else if (typeof obj === 'number') {
+        return obj.toString();
+    } else if (typeof obj === 'string') {
+        // Escape strings that need quotes
+        if (obj.includes('\n') || obj.includes(':') || obj.includes('[') || obj.includes(']') || obj.includes('{') || obj.includes('}')) {
+            return `"${obj.replace(/"/g, '\\"')}"`;
+        }
+        return obj;
+    } else if (Array.isArray(obj)) {
+        if (obj.length === 0) {
+            return '[]';
+        }
+        yaml += '\n';
+        obj.forEach(item => {
+            yaml += `${spaces}- ${window.convertToYAML(item, indent + 1).replace(/^\s+/, '')}`;
+            if (typeof item === 'object' && !Array.isArray(item) && item !== null) {
+                yaml += '\n';
+            } else {
+                yaml += '\n';
+            }
+        });
+        return yaml.slice(0, -1); // Remove last newline
+    } else if (typeof obj === 'object') {
+        if (Object.keys(obj).length === 0) {
+            return '{}';
+        }
+        yaml += '\n';
+        Object.entries(obj).forEach(([key, value]) => {
+            const convertedValue = window.convertToYAML(value, indent + 1);
+            if (typeof value === 'object' && !Array.isArray(value) && value !== null && Object.keys(value).length > 0) {
+                yaml += `${spaces}${key}:${convertedValue}\n`;
+            } else if (Array.isArray(value) && value.length > 0) {
+                yaml += `${spaces}${key}:${convertedValue}\n`;
+            } else {
+                yaml += `${spaces}${key}: ${convertedValue}\n`;
+            }
+        });
+        return yaml.slice(0, -1); // Remove last newline
+    }
+    return obj.toString();
 };
 
 window.importGardenData = function (event) {
@@ -165,4 +277,63 @@ window.importGardenData = function (event) {
     reader.readAsText(file);
     // Reset file input
     event.target.value = '';
+};
+
+// Update data statistics in the management panel
+window.updateDataStatistics = function () {
+    const statsContainer = document.getElementById('data-stats');
+    if (!statsContainer) return;
+
+    try {
+        const gardenData = window.gardenStorage.getData();
+        if (!gardenData) {
+            statsContainer.innerHTML = '<p style="color: #7f8c8d;">No data available</p>';
+            return;
+        }
+
+        const stats = window.gardenStorage.calculateGrowthStats();
+        const dailyLogCount = Object.keys(gardenData.dailyLogs || {}).length;
+        const weedEntryCount = Object.keys(gardenData.weedTracker || {}).length;
+
+        // Calculate total seeds and gratitude entries
+        let totalSeeds = 0;
+        let totalGratitude = 0;
+        Object.values(gardenData.dailyLogs || {}).forEach(log => {
+            totalSeeds += (log.seeds || []).length;
+            totalGratitude += (log.gratitude || []).length;
+        });
+
+        // Calculate data size
+        const dataSize = (new Blob([JSON.stringify(gardenData)]).size / 1024).toFixed(1);
+
+        statsContainer.innerHTML = `
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #3498db;">${dailyLogCount}</div>
+                <div style="color: #7f8c8d; font-size: 0.9rem;">Daily Logs</div>
+            </div>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #27ae60;">${totalSeeds}</div>
+                <div style="color: #7f8c8d; font-size: 0.9rem;">Seeds Planted</div>
+            </div>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #e74c3c;">${totalGratitude}</div>
+                <div style="color: #7f8c8d; font-size: 0.9rem;">Gratitude Entries</div>
+            </div>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #9b59b6;">${weedEntryCount}</div>
+                <div style="color: #7f8c8d; font-size: 0.9rem;">Wisdom Entries</div>
+            </div>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #f39c12;">${stats.daysSinceStart}</div>
+                <div style="color: #7f8c8d; font-size: 0.9rem;">Days Growing</div>
+            </div>
+            <div style="padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                <div style="font-size: 1.5rem; font-weight: bold; color: #17a2b8;">${dataSize} KB</div>
+                <div style="color: #7f8c8d; font-size: 0.9rem;">Data Size</div>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error updating data statistics:', error);
+        statsContainer.innerHTML = '<p style="color: #e74c3c;">Error loading statistics</p>';
+    }
 };

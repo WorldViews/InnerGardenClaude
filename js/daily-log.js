@@ -5,7 +5,62 @@ const DailyLogPage = {
     init() {
         this.render();
         this.setupEventListeners();
+        this.fixExistingTimestamps();
         this.loadTodaysLog();
+    },
+
+    fixExistingTimestamps() {
+        // One-time fix for existing data with incorrect timestamps
+        if (!window.gardenStorage) return;
+
+        const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
+        let fixedAny = false;
+
+        Object.entries(dailyLogs).forEach(([date, log]) => {
+            const correctTimestamp = new Date(date + 'T12:00:00').toISOString();
+            let needsUpdate = false;
+
+            // Fix main log timestamp if it doesn't match the date
+            if (!log.timestamp || !this.isTimestampCorrectForDate(log.timestamp, date)) {
+                log.timestamp = correctTimestamp;
+                needsUpdate = true;
+            }
+
+            // Fix seeds timestamps
+            if (log.seeds) {
+                log.seeds.forEach(seed => {
+                    if (!seed.timestamp || !this.isTimestampCorrectForDate(seed.timestamp, date)) {
+                        seed.timestamp = correctTimestamp;
+                        needsUpdate = true;
+                    }
+                });
+            }
+
+            // Fix gratitude timestamps
+            if (log.gratitude) {
+                log.gratitude.forEach(gratitude => {
+                    if (!gratitude.timestamp || !this.isTimestampCorrectForDate(gratitude.timestamp, date)) {
+                        gratitude.timestamp = correctTimestamp;
+                        needsUpdate = true;
+                    }
+                });
+            }
+
+            if (needsUpdate) {
+                window.gardenStorage.saveDailyLog(date, log);
+                fixedAny = true;
+            }
+        });
+
+        if (fixedAny) {
+            window.showNotification('🔧 Fixed timestamps for existing journal entries to ensure proper chronological order!');
+        }
+    },
+
+    isTimestampCorrectForDate(timestamp, date) {
+        // Check if timestamp is from the same date (allowing for any time on that date)
+        const timestampDate = new Date(timestamp).toISOString().split('T')[0];
+        return timestampDate === date;
     },
 
     render() {
@@ -24,7 +79,12 @@ const DailyLogPage = {
                     <button onclick="DailyLogPage.changeDate(-1)">
                         <i class="fas fa-chevron-left"></i>
                     </button>
-                    <input type="date" id="log-date" value="${this.currentDate}">
+                    <div style="text-align: center;">
+                        <input type="date" id="log-date" value="${this.currentDate}">
+                        <div id="day-of-week" style="font-size: 0.9rem; color: #7f8c8d; margin-top: 5px;">
+                            ${this.getDayOfWeek(this.currentDate)}
+                        </div>
+                    </div>
                     <button onclick="DailyLogPage.changeDate(1)">
                         <i class="fas fa-chevron-right"></i>
                     </button>
@@ -127,7 +187,7 @@ const DailyLogPage = {
 
                 <div class="log-actions">
                     <button class="save-btn" onclick="DailyLogPage.saveLog()">
-                        <i class="fas fa-save"></i> Save Today's Log
+                        <i class="fas fa-save"></i> Save Log for <span id="save-date-display">${this.getFormattedDateForSave(this.currentDate)}</span>
                     </button>
                 </div>
             </div>
@@ -137,6 +197,8 @@ const DailyLogPage = {
     setupEventListeners() {
         document.getElementById('log-date').addEventListener('change', (e) => {
             this.currentDate = e.target.value;
+            this.clearFormFields();
+            this.updateDateDisplay();
             this.loadTodaysLog();
         });
 
@@ -170,11 +232,80 @@ const DailyLogPage = {
         return labels[mood] || 'Unknown';
     },
 
+    getDayOfWeek(dateString) {
+        // Create date object in local timezone to avoid UTC conversion issues
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
+        const options = { weekday: 'long' };
+        return date.toLocaleDateString('en-US', options);
+    },
+
+    getFormattedDateForSave(dateString) {
+        // Create date objects in local timezone to avoid UTC conversion issues
+        const [year, month, day] = dateString.split('-').map(Number);
+        const inputDate = new Date(year, month - 1, day);
+
+        const today = new Date();
+        const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+        const tomorrow = new Date(todayDate);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const yesterday = new Date(todayDate);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        if (inputDate.getTime() === todayDate.getTime()) {
+            return 'Today';
+        } else if (inputDate.getTime() === tomorrow.getTime()) {
+            return 'Tomorrow';
+        } else if (inputDate.getTime() === yesterday.getTime()) {
+            return 'Yesterday';
+        } else {
+            return this.getDayOfWeek(dateString);
+        }
+    },
+
+    clearFormFields() {
+        // Clear mood selection
+        document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
+
+        // Clear weather tags
+        document.querySelectorAll('.weather-tag').forEach(tag => tag.classList.remove('selected'));
+
+        // Clear activities
+        document.querySelectorAll('.activity-item input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        document.querySelectorAll('.activity-item input[type="number"]').forEach(input => {
+            input.value = '';
+        });
+
+        // Clear observations
+        document.getElementById('observations').value = '';
+
+        // Clear seeds list
+        document.getElementById('seeds-list').innerHTML = '';
+
+        // Clear gratitude list
+        document.getElementById('gratitude-list').innerHTML = '';
+
+        // Clear input fields
+        document.getElementById('new-seed').value = '';
+        document.getElementById('new-gratitude').value = '';
+    },
+
+    updateDateDisplay() {
+        document.getElementById('day-of-week').textContent = this.getDayOfWeek(this.currentDate);
+        document.getElementById('save-date-display').textContent = this.getFormattedDateForSave(this.currentDate);
+    },
+
     changeDate(direction) {
         const currentDate = new Date(this.currentDate);
         currentDate.setDate(currentDate.getDate() + direction);
         this.currentDate = currentDate.toISOString().split('T')[0];
         document.getElementById('log-date').value = this.currentDate;
+        this.clearFormFields();
+        this.updateDateDisplay();
         this.loadTodaysLog();
     },
 
@@ -304,8 +435,13 @@ const DailyLogPage = {
     },
 
     saveLog() {
+        // Create timestamp for the date being edited, not current time
+        const logDateTime = new Date(this.currentDate + 'T12:00:00');
+        const logTimestamp = logDateTime.toISOString();
+
         const logData = {
             date: this.currentDate,
+            timestamp: logTimestamp,
             moodRating: document.querySelector('.mood-btn.selected')?.dataset.mood || null,
             weatherTags: Array.from(document.querySelectorAll('.weather-tag.selected')).map(tag => tag.dataset.weather),
             activities: {},
@@ -313,12 +449,12 @@ const DailyLogPage = {
             seeds: Array.from(document.querySelectorAll('.seed-item')).map(item => ({
                 id: parseInt(item.dataset.seedId),
                 text: item.querySelector('span').textContent.replace('🌱 ', ''),
-                timestamp: new Date().toISOString()
+                timestamp: logTimestamp
             })),
             gratitude: Array.from(document.querySelectorAll('.gratitude-item')).map(item => ({
                 id: parseInt(item.dataset.gratitudeId),
                 text: item.querySelector('span').textContent.replace('🌸 ', ''),
-                timestamp: new Date().toISOString()
+                timestamp: logTimestamp
             }))
         };
 

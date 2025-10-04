@@ -210,9 +210,14 @@ const GardenVisualization = {
             this.drawFlower(flower, timestamp);
         });
 
-        // Draw butterflies occasionally
-        if (Math.random() < 0.001) {
+        // Draw butterflies very frequently for testing - you should definitely see them!
+        if (Math.random() < 0.1) { // Dramatically increased to 10% chance per frame
             this.drawButterfly(timestamp);
+        }
+
+        // Add floating sparkles for more life
+        if (Math.random() < 0.02) {
+            this.drawSparkle(timestamp);
         }
     },
 
@@ -266,17 +271,18 @@ const GardenVisualization = {
     drawFlower(flower, timestamp) {
         if (flower.growth <= 0) return;
 
-        const swayAmount = Math.sin((timestamp * 0.001) + flower.swayOffset) * 3;
+        // Make swaying slower - reduced speed by factor of 3 (0.002 → 0.0007)
+        const swayAmount = Math.sin((timestamp * 0.0007) + flower.swayOffset) * 8;
         const x = flower.x + swayAmount;
         const y = flower.y;
 
-        // Draw stem
+        // Draw stem with more pronounced curve
         const stemHeight = flower.size * flower.growth;
         this.ctx.strokeStyle = '#228B22';
         this.ctx.lineWidth = 3;
         this.ctx.beginPath();
         this.ctx.moveTo(x, this.canvas.height - 30);
-        this.ctx.quadraticCurveTo(x + swayAmount * 2, y + stemHeight / 2, x, y);
+        this.ctx.quadraticCurveTo(x + swayAmount * 3, y + stemHeight / 2, x, y);
         this.ctx.stroke();
 
         // Draw leaves
@@ -306,20 +312,20 @@ const GardenVisualization = {
     drawLeaves(x, y, swayAmount) {
         this.ctx.fillStyle = '#32CD32';
 
-        // Left leaf
+        // Left leaf - ensure positive radii
         this.ctx.beginPath();
-        this.ctx.ellipse(x - 8 + swayAmount, y, 6, 12, -0.3, 0, Math.PI * 2);
+        this.ctx.ellipse(x - 8 + swayAmount, y, Math.abs(6), Math.abs(12), -0.3, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Right leaf
+        // Right leaf - ensure positive radii
         this.ctx.beginPath();
-        this.ctx.ellipse(x + 8 + swayAmount, y, 6, 12, 0.3, 0, Math.PI * 2);
+        this.ctx.ellipse(x + 8 + swayAmount, y, Math.abs(6), Math.abs(12), 0.3, 0, Math.PI * 2);
         this.ctx.fill();
     },
 
     drawSeedFlower(x, y, flower) {
         const petalCount = 5;
-        const petalSize = flower.size * 0.3 * flower.growth;
+        const petalSize = Math.max(0, flower.size * 0.3 * flower.growth);
 
         // Draw petals
         this.ctx.fillStyle = flower.color;
@@ -329,20 +335,20 @@ const GardenVisualization = {
             const petalY = y + Math.sin(angle) * petalSize * 0.7;
 
             this.ctx.beginPath();
-            this.ctx.ellipse(petalX, petalY, petalSize, petalSize * 1.5, angle, 0, Math.PI * 2);
+            this.ctx.ellipse(petalX, petalY, Math.abs(petalSize), Math.abs(petalSize * 1.5), angle, 0, Math.PI * 2);
             this.ctx.fill();
         }
 
         // Draw center
         this.ctx.fillStyle = '#FFD700';
         this.ctx.beginPath();
-        this.ctx.arc(x, y, petalSize * 0.4, 0, Math.PI * 2);
+        this.ctx.arc(x, y, Math.abs(petalSize * 0.4), 0, Math.PI * 2);
         this.ctx.fill();
     },
 
     drawGratitudeFlower(x, y, flower) {
         const petalCount = 8;
-        const petalSize = flower.size * 0.25 * flower.growth;
+        const petalSize = Math.max(0, flower.size * 0.25 * flower.growth);
 
         // Draw petals in a daisy pattern
         this.ctx.fillStyle = flower.color;
@@ -352,24 +358,24 @@ const GardenVisualization = {
             const petalY = y + Math.sin(angle) * petalSize;
 
             this.ctx.beginPath();
-            this.ctx.ellipse(petalX, petalY, petalSize * 0.3, petalSize, angle, 0, Math.PI * 2);
+            this.ctx.ellipse(petalX, petalY, Math.abs(petalSize * 0.3), Math.abs(petalSize), angle, 0, Math.PI * 2);
             this.ctx.fill();
         }
 
         // Draw center
         this.ctx.fillStyle = '#FF6347';
         this.ctx.beginPath();
-        this.ctx.arc(x, y, petalSize * 0.5, 0, Math.PI * 2);
+        this.ctx.arc(x, y, Math.abs(petalSize * 0.5), 0, Math.PI * 2);
         this.ctx.fill();
     },
 
     drawWisdomFlower(x, y, flower) {
         const layers = 3;
-        const baseSize = flower.size * 0.2 * flower.growth;
+        const baseSize = Math.max(0, flower.size * 0.2 * flower.growth);
 
         // Draw multiple layers for complexity
         for (let layer = 0; layer < layers; layer++) {
-            const layerSize = baseSize * (1 - layer * 0.3);
+            const layerSize = Math.max(0, baseSize * (1 - layer * 0.3));
             const petalCount = 6 + layer * 2;
             const opacity = 1 - layer * 0.3;
 
@@ -383,7 +389,7 @@ const GardenVisualization = {
                 const petalY = y + Math.sin(angle) * layerSize * (0.8 + layer * 0.2);
 
                 this.ctx.beginPath();
-                this.ctx.ellipse(petalX, petalY, layerSize * 0.4, layerSize * 1.2, angle, 0, Math.PI * 2);
+                this.ctx.ellipse(petalX, petalY, Math.abs(layerSize * 0.4), Math.abs(layerSize * 1.2), angle, 0, Math.PI * 2);
                 this.ctx.fill();
             }
         }
@@ -391,16 +397,16 @@ const GardenVisualization = {
         // Draw wisdom center
         this.ctx.fillStyle = '#4B0082';
         this.ctx.beginPath();
-        this.ctx.arc(x, y, baseSize * 0.3, 0, Math.PI * 2);
+        this.ctx.arc(x, y, Math.abs(baseSize * 0.3), 0, Math.PI * 2);
         this.ctx.fill();
     },
 
     drawBud(x, y, flower) {
-        const budSize = flower.size * 0.2 * flower.growth;
+        const budSize = Math.max(0, flower.size * 0.2 * flower.growth);
 
         this.ctx.fillStyle = '#90EE90';
         this.ctx.beginPath();
-        this.ctx.ellipse(x, y, budSize, budSize * 1.5, 0, 0, Math.PI * 2);
+        this.ctx.ellipse(x, y, Math.abs(budSize), Math.abs(budSize * 1.5), 0, 0, Math.PI * 2);
         this.ctx.fill();
 
         // Add some detail lines
@@ -415,9 +421,9 @@ const GardenVisualization = {
     },
 
     drawButterfly(timestamp) {
-        const butterflyX = 50 + Math.sin(timestamp * 0.002) * (this.canvas.width - 100);
-        const butterflyY = 100 + Math.cos(timestamp * 0.003) * 50;
-        const wingFlap = Math.sin(timestamp * 0.01) * 0.3;
+        const butterflyX = 50 + Math.sin(timestamp * 0.00015) * (this.canvas.width - 100); // Slowed down by factor of 5 (0.0007 → 0.00015)
+        const butterflyY = 100 + Math.cos(timestamp * 0.0002) * 50; // Slowed down by factor of 5 (0.001 → 0.0002)
+        const wingFlap = Math.sin(timestamp * 0.0008) * 0.3; // Slowed down by factor of 4 (0.003 → 0.0008)
 
         // Butterfly body
         this.ctx.fillStyle = '#8B4513';
@@ -426,24 +432,46 @@ const GardenVisualization = {
         // Wings
         this.ctx.fillStyle = '#FF69B4';
 
-        // Upper wings
+        // Upper wings - ensure positive radii
         this.ctx.beginPath();
-        this.ctx.ellipse(butterflyX - 4, butterflyY - 4 + wingFlap, 6, 8, -0.3 + wingFlap, 0, Math.PI * 2);
+        this.ctx.ellipse(butterflyX - 4, butterflyY - 4 + wingFlap, Math.abs(6), Math.abs(8), -0.3 + wingFlap, 0, Math.PI * 2);
         this.ctx.fill();
 
         this.ctx.beginPath();
-        this.ctx.ellipse(butterflyX + 4, butterflyY - 4 + wingFlap, 6, 8, 0.3 - wingFlap, 0, Math.PI * 2);
+        this.ctx.ellipse(butterflyX + 4, butterflyY - 4 + wingFlap, Math.abs(6), Math.abs(8), 0.3 - wingFlap, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Lower wings
+        // Lower wings - ensure positive radii
         this.ctx.fillStyle = '#FFB6C1';
         this.ctx.beginPath();
-        this.ctx.ellipse(butterflyX - 3, butterflyY + 4 - wingFlap, 4, 6, -0.2 - wingFlap, 0, Math.PI * 2);
+        this.ctx.ellipse(butterflyX - 3, butterflyY + 4 - wingFlap, Math.abs(4), Math.abs(6), -0.2 - wingFlap, 0, Math.PI * 2);
         this.ctx.fill();
 
         this.ctx.beginPath();
-        this.ctx.ellipse(butterflyX + 3, butterflyY + 4 - wingFlap, 4, 6, 0.2 + wingFlap, 0, Math.PI * 2);
+        this.ctx.ellipse(butterflyX + 3, butterflyY + 4 - wingFlap, Math.abs(4), Math.abs(6), 0.2 + wingFlap, 0, Math.PI * 2);
         this.ctx.fill();
+    },
+
+    drawSparkle(timestamp) {
+        const sparkleX = Math.random() * this.canvas.width;
+        const sparkleY = 50 + Math.random() * (this.canvas.height - 100);
+        const sparkleSize = 2 + Math.random() * 3;
+        const opacity = 0.3 + Math.sin(timestamp * 0.003) * 0.3; // Slowed down by factor of 3
+
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${opacity})`;
+        this.ctx.beginPath();
+        this.ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Add cross sparkle effect
+        this.ctx.strokeStyle = `rgba(255, 255, 255, ${opacity})`;
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.moveTo(sparkleX - sparkleSize * 2, sparkleY);
+        this.ctx.lineTo(sparkleX + sparkleSize * 2, sparkleY);
+        this.ctx.moveTo(sparkleX, sparkleY - sparkleSize * 2);
+        this.ctx.lineTo(sparkleX, sparkleY + sparkleSize * 2);
+        this.ctx.stroke();
     },
 
     showFlowerTooltip(event) {

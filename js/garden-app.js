@@ -35,6 +35,11 @@ class GardenApp {
         document.getElementById('wellness-score').textContent = stats.wellnessScore;
 
         this.updateMoodIndicator(stats.wellnessScore);
+
+        // Update data statistics if the panel exists
+        if (window.updateDataStatistics) {
+            window.updateDataStatistics();
+        }
     }
 
     updateMoodIndicator(wellnessScore) {
@@ -79,7 +84,7 @@ class GardenApp {
 
     showPage(pageId) {
         try {
-            const homeElements = document.querySelectorAll('.header, .garden-overview, .navigation-grid');
+            const homeElements = document.querySelectorAll('.header, .garden-overview, .navigation-grid, .data-management-panel');
             homeElements.forEach(el => el.style.display = 'none');
 
             const pageContainers = document.querySelectorAll('.current-page');
@@ -100,7 +105,7 @@ class GardenApp {
 
     showHome() {
         try {
-            const homeElements = document.querySelectorAll('.header, .garden-overview, .navigation-grid');
+            const homeElements = document.querySelectorAll('.header, .garden-overview, .navigation-grid, .data-management-panel');
             homeElements.forEach(el => el.style.display = 'block');
 
             const pageContainers = document.querySelectorAll('.current-page');

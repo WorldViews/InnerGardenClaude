@@ -118,13 +118,16 @@ const CompleteJournalPage = {
         // Load daily logs
         const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
         Object.entries(dailyLogs).forEach(([date, log]) => {
+            // Create proper fallback timestamp to avoid timezone issues
+            const fallbackTimestamp = new Date(date + 'T12:00:00').toISOString();
+
             // Main daily log entry
             this.allEntries.push({
                 id: `daily-${date}`,
                 type: 'daily-logs',
                 date: date,
-                timestamp: log.timestamp || new Date(date).toISOString(),
-                title: `Daily Log - ${new Date(date).toLocaleDateString()}`,
+                timestamp: log.timestamp || fallbackTimestamp,
+                title: `Daily Log - ${new Date(date + 'T12:00:00').toLocaleDateString()}`,
                 content: this.formatDailyLogContent(log),
                 rawData: log,
                 mood: log.moodRating,
@@ -138,7 +141,7 @@ const CompleteJournalPage = {
                         id: `seed-${date}-${index}`,
                         type: 'goals',
                         date: date,
-                        timestamp: seed.timestamp || log.timestamp || new Date(date).toISOString(),
+                        timestamp: seed.timestamp || log.timestamp || fallbackTimestamp,
                         title: `Goal/Intention`,
                         content: seed.text,
                         rawData: seed,
@@ -154,7 +157,7 @@ const CompleteJournalPage = {
                         id: `gratitude-${date}-${index}`,
                         type: 'gratitude',
                         date: date,
-                        timestamp: gratitude.timestamp || log.timestamp || new Date(date).toISOString(),
+                        timestamp: gratitude.timestamp || log.timestamp || fallbackTimestamp,
                         title: `Gratitude`,
                         content: gratitude.text,
                         rawData: gratitude,
@@ -169,7 +172,7 @@ const CompleteJournalPage = {
                     id: `observation-${date}`,
                     type: 'observations',
                     date: date,
-                    timestamp: log.timestamp || new Date(date).toISOString(),
+                    timestamp: log.timestamp || fallbackTimestamp,
                     title: `Growth Observations`,
                     content: log.observations,
                     rawData: { observations: log.observations },
