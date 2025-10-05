@@ -210,8 +210,8 @@ const GardenVisualization = {
             this.drawFlower(flower, timestamp);
         });
 
-        // Draw butterflies very frequently for testing - you should definitely see them!
-        if (Math.random() < 0.1) { // Dramatically increased to 10% chance per frame
+        // Draw butterflies at a pleasant frequency
+        if (Math.random() < 0.008) { // Reduced from 0.1 (10%) to 0.008 (0.8%)
             this.drawButterfly(timestamp);
         }
 

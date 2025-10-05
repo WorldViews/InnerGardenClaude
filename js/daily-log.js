@@ -206,6 +206,18 @@ const DailyLogPage = {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
                 e.target.classList.add('selected');
+
+                // Trigger PeaceTree mood lighting if available
+                const moodScore = e.target.dataset.mood;
+                console.log(`DailyLog: 🎭 Mood button clicked! Score: ${moodScore}`);
+                console.log(`DailyLog: 🌳 PeaceTreeMQTT available: ${!!window.PeaceTreeMQTT}`);
+
+                if (window.PeaceTreeMQTT && moodScore) {
+                    console.log(`DailyLog: 📡 Calling PeaceTreeMQTT.setMoodLighting(${parseInt(moodScore)})`);
+                    window.PeaceTreeMQTT.setMoodLighting(parseInt(moodScore));
+                } else {
+                    console.log(`DailyLog: ❌ Cannot call PeaceTree - PeaceTreeMQTT: ${!!window.PeaceTreeMQTT}, moodScore: ${moodScore}`);
+                }
             });
         });
 
@@ -376,6 +388,11 @@ const DailyLogPage = {
             if (moodBtn) {
                 document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
                 moodBtn.classList.add('selected');
+
+                // Update PeaceTree lighting for loaded mood
+                if (window.PeaceTreeMQTT) {
+                    window.PeaceTreeMQTT.setMoodLighting(parseInt(logData.moodRating));
+                }
             }
         }
 
