@@ -572,7 +572,7 @@ const DailyLogPage = {
 
         // Add table header
         const headerHtml = `
-            <div class="checkins-header" style="border-bottom: 1px solid #ddd; margin-bottom: 5px;">
+            <div class="checkins-header" style="border-bottom: 1px solid #ddd; margin: 0 20px 5px 16px;">
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr style="color: #666; font-size: 0.85rem; font-weight: bold;">
                         <td style="width: 90px; padding: 5px 10px 5px 0;">Time</td>
