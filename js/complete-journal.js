@@ -203,12 +203,38 @@ const CompleteJournalPage = {
     formatDailyLogContent(log) {
         let content = [];
 
-        if (log.moodRating) {
-            content.push(`Mood: ${log.moodRating}/10`);
-        }
+        // Check-ins (new format)
+        if (log.checkins && log.checkins.length > 0) {
+            content.push(`Check-ins (${log.checkins.length}):`);
+            log.checkins.forEach((checkin, index) => {
+                const time = new Date(checkin.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                let checkinLine = `  ${time}:`;
 
-        if (log.weatherTags && log.weatherTags.length > 0) {
-            content.push(`Inner Weather: ${log.weatherTags.join(', ')}`);
+                if (checkin.moodRating) {
+                    checkinLine += ` Mood ${checkin.moodRating}/10`;
+                }
+
+                if (checkin.weatherTags && checkin.weatherTags.length > 0) {
+                    const weatherEmojis = checkin.weatherTags.map(w => this.getWeatherEmoji(w));
+                    checkinLine += ` ${weatherEmojis.join(' ')}`;
+                }
+
+                if (checkin.comment) {
+                    checkinLine += ` - "${checkin.comment}"`;
+                }
+
+                content.push(checkinLine);
+            });
+        }
+        // Legacy single mood/weather (old format)
+        else {
+            if (log.moodRating) {
+                content.push(`Mood: ${log.moodRating}/10`);
+            }
+
+            if (log.weatherTags && log.weatherTags.length > 0) {
+                content.push(`Inner Weather: ${log.weatherTags.join(', ')}`);
+            }
         }
 
         if (log.activities) {
@@ -233,6 +259,14 @@ const CompleteJournalPage = {
         }
 
         return content.join('\n');
+    },
+
+    getWeatherEmoji(weather) {
+        const emojis = {
+            sunny: '☀️', cloudy: '☁️', stormy: '⛈️',
+            foggy: '🌫️', windy: '💨', calm: '🌅'
+        };
+        return emojis[weather] || '🌤️';
     },
 
     formatWisdomContent(weed) {

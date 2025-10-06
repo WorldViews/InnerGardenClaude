@@ -2,12 +2,15 @@
 class GardenStorage {
     constructor() {
         this.storageKey = 'inner-garden-data';
+        this.currentSchemaVersion = 2; // Updated for check-ins feature
         this.initializeStorage();
+        this.migrateSchema();
     }
 
     initializeStorage() {
         if (!localStorage.getItem(this.storageKey)) {
             const initialData = {
+                schemaVersion: this.currentSchemaVersion,
                 profile: {
                     gardenStartDate: new Date().toISOString().split('T')[0],
                     name: '',
@@ -29,6 +32,58 @@ class GardenStorage {
             };
             this.saveData(initialData);
         }
+    }
+
+    migrateSchema() {
+        const data = this.getData();
+        if (!data) return;
+
+        const currentVersion = data.schemaVersion || 1;
+
+        if (currentVersion < this.currentSchemaVersion) {
+            console.log(`🔄 Migrating garden data from schema v${currentVersion} to v${this.currentSchemaVersion}`);
+
+            if (currentVersion === 1) {
+                this.migrateToV2(data);
+            }
+
+            // Future migrations would go here
+            // if (currentVersion < 3) { this.migrateToV3(data); }
+
+            data.schemaVersion = this.currentSchemaVersion;
+            this.saveData(data);
+            console.log('✅ Schema migration completed successfully!');
+        }
+    }
+
+    migrateToV2(data) {
+        // Convert single mood/weather per day to check-ins array
+        console.log('📝 Converting daily logs to support multiple check-ins...');
+
+        Object.entries(data.dailyLogs || {}).forEach(([date, log]) => {
+            if (log.moodRating || log.weatherTags) {
+                // Create check-in from existing mood/weather data
+                const checkin = {
+                    id: Date.now() + Math.random() * 1000, // Unique ID
+                    timestamp: log.timestamp || new Date(date + 'T12:00:00').toISOString(),
+                    moodRating: log.moodRating || null,
+                    weatherTags: log.weatherTags || [],
+                    comment: log.observations ? `Migrated note: ${log.observations.substring(0, 100)}...` : ''
+                };
+
+                // Initialize checkins array and add the migrated check-in
+                log.checkins = [checkin];
+
+                // Remove old single mood/weather fields
+                delete log.moodRating;
+                delete log.weatherTags;
+            } else {
+                // Ensure checkins array exists even if no mood/weather data
+                log.checkins = log.checkins || [];
+            }
+        });
+
+        console.log('✅ Daily logs migration completed');
     }
 
     getData() {
@@ -93,6 +148,104 @@ class GardenStorage {
         return this.getSection('weedTracker') || {};
     }
 
+    // Check-in Management Methods
+    addCheckin(date, checkinData) {
+        const dailyLogs = this.getSection('dailyLogs') || {};
+
+        if (!dailyLogs[date]) {
+            dailyLogs[date] = {
+                date: date,
+                timestamp: new Date().toISOString(),
+                checkins: [],
+                activities: {},
+                seeds: [],
+                gratitude: [],
+                observations: ''
+            };
+        }
+
+        if (!dailyLogs[date].checkins) {
+            dailyLogs[date].checkins = [];
+        }
+
+        const checkin = {
+            id: Date.now() + Math.random() * 1000,
+            timestamp: new Date().toISOString(),
+            moodRating: checkinData.moodRating || null,
+            weatherTags: checkinData.weatherTags || [],
+            comment: checkinData.comment || ''
+        };
+
+        dailyLogs[date].checkins.push(checkin);
+
+        // Trigger PeaceTree lighting for new check-in
+        if (checkin.moodRating && window.PeaceTreeMQTT) {
+            window.PeaceTreeMQTT.setMoodLighting(checkin.moodRating);
+        }
+
+        return this.saveSection('dailyLogs', dailyLogs) ? checkin : null;
+    }
+
+    updateCheckin(date, checkinId, updates) {
+        const dailyLogs = this.getSection('dailyLogs') || {};
+
+        if (!dailyLogs[date] || !dailyLogs[date].checkins) {
+            return false;
+        }
+
+        const checkinIndex = dailyLogs[date].checkins.findIndex(c => c.id === checkinId);
+        if (checkinIndex === -1) {
+            return false;
+        }
+
+        // Update the check-in
+        Object.assign(dailyLogs[date].checkins[checkinIndex], updates);
+        dailyLogs[date].checkins[checkinIndex].lastModified = new Date().toISOString();
+
+        // Trigger PeaceTree lighting if mood was updated
+        if (updates.moodRating && window.PeaceTreeMQTT) {
+            window.PeaceTreeMQTT.setMoodLighting(updates.moodRating);
+        }
+
+        return this.saveSection('dailyLogs', dailyLogs);
+    }
+
+    deleteCheckin(date, checkinId) {
+        const dailyLogs = this.getSection('dailyLogs') || {};
+
+        if (!dailyLogs[date] || !dailyLogs[date].checkins) {
+            return false;
+        }
+
+        const initialLength = dailyLogs[date].checkins.length;
+        dailyLogs[date].checkins = dailyLogs[date].checkins.filter(c => c.id !== checkinId);
+
+        const wasDeleted = dailyLogs[date].checkins.length < initialLength;
+
+        if (wasDeleted) {
+            return this.saveSection('dailyLogs', dailyLogs);
+        }
+
+        return false;
+    }
+
+    getCheckins(date) {
+        const dailyLog = this.getDailyLog(date);
+        return dailyLog?.checkins || [];
+    }
+
+    getLatestMoodForLighting(date) {
+        const checkins = this.getCheckins(date);
+        if (checkins.length === 0) return null;
+
+        // Find the most recent check-in with a mood rating
+        const checkinsWithMood = checkins.filter(c => c.moodRating).sort((a, b) =>
+            new Date(b.timestamp) - new Date(a.timestamp)
+        );
+
+        return checkinsWithMood.length > 0 ? checkinsWithMood[0].moodRating : null;
+    }
+
     calculateGrowthStats() {
         const data = this.getData();
         const dailyLogs = data?.dailyLogs || {};
@@ -148,12 +301,32 @@ class GardenStorage {
 
         if (recent.length === 0) return '--';
 
-        const totalMood = recent.reduce((sum, [, log]) => {
-            const moodRating = parseInt(log.moodRating) || 5;
-            return sum + moodRating;
-        }, 0);
+        let totalMood = 0;
+        let moodCount = 0;
 
-        return Math.round((totalMood / recent.length) * 10) / 10;
+        recent.forEach(([, log]) => {
+            // Handle both old format (direct moodRating) and new format (checkins)
+            if (log.checkins && log.checkins.length > 0) {
+                // New format: get average mood from check-ins for this day
+                const dayMoods = log.checkins
+                    .filter(checkin => checkin.moodRating)
+                    .map(checkin => parseInt(checkin.moodRating));
+
+                if (dayMoods.length > 0) {
+                    const dayAverage = dayMoods.reduce((sum, mood) => sum + mood, 0) / dayMoods.length;
+                    totalMood += dayAverage;
+                    moodCount++;
+                }
+            } else if (log.moodRating) {
+                // Old format: direct mood rating
+                totalMood += parseInt(log.moodRating);
+                moodCount++;
+            }
+        });
+
+        if (moodCount === 0) return '--';
+
+        return Math.round((totalMood / moodCount) * 10) / 10;
     }
 
     daysBetween(date1, date2) {

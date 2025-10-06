@@ -1,6 +1,6 @@
 // Daily Log Page functionality
 const DailyLogPage = {
-    currentDate: new Date().toISOString().split('T')[0],
+    currentDate: new Date().toLocaleDateString('en-CA'), // Use local date in YYYY-MM-DD format
 
     init() {
         this.render();
@@ -92,27 +92,47 @@ const DailyLogPage = {
 
                 <div class="log-sections">
                     <div class="log-section">
-                        <h3><i class="fas fa-sun"></i> Today's Inner Weather</h3>
-                        <div class="mood-rating">
-                            <label>How are you feeling today?</label>
-                            <div class="mood-scale">
-                                ${Array.from({ length: 10 }, (_, i) => `
-                                    <button class="mood-btn" data-mood="${i + 1}" title="${this.getMoodLabel(i + 1)}">
-                                        ${i + 1}
-                                    </button>
-                                `).join('')}
-                            </div>
-                        </div>
+                        <h3><i class="fas fa-heart-pulse"></i> Daily Check-ins</h3>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">Track your mood and inner weather throughout the day</p>
                         
-                        <div class="weather-tags">
-                            <label>Inner weather patterns:</label>
-                            <div class="tag-group">
-                                <span class="weather-tag" data-weather="sunny">☀️ Sunny</span>
-                                <span class="weather-tag" data-weather="cloudy">☁️ Cloudy</span>
-                                <span class="weather-tag" data-weather="stormy">⛈️ Stormy</span>
-                                <span class="weather-tag" data-weather="foggy">🌫️ Foggy</span>
-                                <span class="weather-tag" data-weather="windy">💨 Windy</span>
-                                <span class="weather-tag" data-weather="calm">🌅 Calm</span>
+                        <div class="checkin-form">
+                            <div class="mood-rating">
+                                <label>How are you feeling right now?</label>
+                                <div class="mood-scale">
+                                    ${Array.from({ length: 10 }, (_, i) => `
+                                        <button class="mood-btn" data-mood="${i + 1}" title="${this.getMoodLabel(i + 1)}">
+                                            ${i + 1}
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="weather-tags">
+                                <label>Inner weather patterns:</label>
+                                <div class="tag-group">
+                                    <span class="weather-tag" data-weather="sunny">☀️ Sunny</span>
+                                    <span class="weather-tag" data-weather="cloudy">☁️ Cloudy</span>
+                                    <span class="weather-tag" data-weather="stormy">⛈️ Stormy</span>
+                                    <span class="weather-tag" data-weather="foggy">🌫️ Foggy</span>
+                                    <span class="weather-tag" data-weather="windy">💨 Windy</span>
+                                    <span class="weather-tag" data-weather="calm">🌅 Calm</span>
+                                </div>
+                            </div>
+
+                            <div class="checkin-comment">
+                                <label>Optional note:</label>
+                                <textarea id="checkin-comment" placeholder="What's happening in your inner world right now? Any thoughts or insights?"></textarea>
+                            </div>
+
+                            <button class="checkin-btn" onclick="DailyLogPage.addCheckin()">
+                                <i class="fas fa-plus"></i> Add Check-in
+                            </button>
+                        </div>
+
+                        <div class="checkins-history">
+                            <h4><i class="fas fa-clock"></i> Today's Check-ins</h4>
+                            <div id="checkins-list" class="checkins-list">
+                                <!-- Check-ins will be loaded here -->
                             </div>
                         </div>
                     </div>
@@ -184,12 +204,6 @@ const DailyLogPage = {
                         </div>
                     </div>
                 </div>
-
-                <div class="log-actions">
-                    <button class="save-btn" onclick="DailyLogPage.saveLog()">
-                        <i class="fas fa-save"></i> Save Log for <span id="save-date-display">${this.getFormattedDateForSave(this.currentDate)}</span>
-                    </button>
-                </div>
             </div>
         `;
     },
@@ -206,18 +220,7 @@ const DailyLogPage = {
             btn.addEventListener('click', (e) => {
                 document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
                 e.target.classList.add('selected');
-
-                // Trigger PeaceTree mood lighting if available
-                const moodScore = e.target.dataset.mood;
-                console.log(`DailyLog: 🎭 Mood button clicked! Score: ${moodScore}`);
-                console.log(`DailyLog: 🌳 PeaceTreeMQTT available: ${!!window.PeaceTreeMQTT}`);
-
-                if (window.PeaceTreeMQTT && moodScore) {
-                    console.log(`DailyLog: 📡 Calling PeaceTreeMQTT.setMoodLighting(${parseInt(moodScore)})`);
-                    window.PeaceTreeMQTT.setMoodLighting(parseInt(moodScore));
-                } else {
-                    console.log(`DailyLog: ❌ Cannot call PeaceTree - PeaceTreeMQTT: ${!!window.PeaceTreeMQTT}, moodScore: ${moodScore}`);
-                }
+                // Note: PeaceTree lighting will be triggered when check-in is saved
             });
         });
 
@@ -233,6 +236,19 @@ const DailyLogPage = {
 
         document.getElementById('new-gratitude').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') this.addGratitude();
+        });
+
+        // Auto-save for observations
+        document.getElementById('observations').addEventListener('input', () => {
+            this.autoSaveLog();
+        });
+
+        // Auto-save for activities (after a short delay to avoid excessive saves)
+        document.querySelectorAll('.activity-item input').forEach(input => {
+            input.addEventListener('change', () => {
+                clearTimeout(this.autoSaveTimeout);
+                this.autoSaveTimeout = setTimeout(() => this.autoSaveLog(), 1000);
+            });
         });
     },
 
@@ -278,11 +294,14 @@ const DailyLogPage = {
     },
 
     clearFormFields() {
-        // Clear mood selection
-        document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
+        // Clear check-in form
+        this.clearCheckinForm();
 
-        // Clear weather tags
-        document.querySelectorAll('.weather-tag').forEach(tag => tag.classList.remove('selected'));
+        // Clear check-ins list display
+        const checkinsContainer = document.getElementById('checkins-list');
+        if (checkinsContainer) {
+            checkinsContainer.innerHTML = '';
+        }
 
         // Clear activities
         document.querySelectorAll('.activity-item input[type="checkbox"]').forEach(checkbox => {
@@ -304,11 +323,159 @@ const DailyLogPage = {
         // Clear input fields
         document.getElementById('new-seed').value = '';
         document.getElementById('new-gratitude').value = '';
+
+        // Reset add button in case it was in edit mode
+        this.resetAddButton();
     },
 
     updateDateDisplay() {
         document.getElementById('day-of-week').textContent = this.getDayOfWeek(this.currentDate);
-        document.getElementById('save-date-display').textContent = this.getFormattedDateForSave(this.currentDate);
+        // Note: save-date-display element no longer exists since we removed the save button
+    },
+
+    addCheckin() {
+        const selectedMood = document.querySelector('.mood-btn.selected');
+        const selectedWeather = Array.from(document.querySelectorAll('.weather-tag.selected'));
+        const comment = document.getElementById('checkin-comment').value.trim();
+
+        if (!selectedMood && selectedWeather.length === 0 && !comment) {
+            window.showNotification('Please select a mood, weather, or add a comment for your check-in', 'warning');
+            return;
+        }
+
+        const checkinData = {
+            moodRating: selectedMood ? parseInt(selectedMood.dataset.mood) : null,
+            weatherTags: selectedWeather.map(tag => tag.dataset.weather),
+            comment: comment
+        };
+
+        const newCheckin = window.gardenStorage.addCheckin(this.currentDate, checkinData);
+
+        if (newCheckin) {
+            this.clearCheckinForm();
+            this.loadTodaysCheckins();
+            window.showNotification('Check-in saved! 📝', 'success');
+
+            // Trigger PeaceTree lighting if mood was selected
+            if (checkinData.moodRating && window.PeaceTreeMQTT) {
+                window.PeaceTreeMQTT.setMoodLighting(checkinData.moodRating);
+            }
+        } else {
+            window.showNotification('Error saving check-in. Please try again.', 'error');
+        }
+    },
+
+    editCheckin(checkinId) {
+        const checkin = window.gardenStorage.getCheckins(this.currentDate).find(c => c.id === checkinId);
+        if (!checkin) return;
+
+        // Populate form with existing data
+        this.clearCheckinForm();
+
+        if (checkin.moodRating) {
+            const moodBtn = document.querySelector(`[data-mood="${checkin.moodRating}"]`);
+            if (moodBtn) moodBtn.classList.add('selected');
+        }
+
+        checkin.weatherTags.forEach(weather => {
+            const tag = document.querySelector(`[data-weather="${weather}"]`);
+            if (tag) tag.classList.add('selected');
+        });
+
+        document.getElementById('checkin-comment').value = checkin.comment || '';
+
+        // Update the add button to become an update button
+        const addBtn = document.querySelector('.checkin-btn');
+        addBtn.innerHTML = '<i class="fas fa-save"></i> Update Check-in';
+        addBtn.onclick = () => this.updateCheckin(checkinId);
+    },
+
+    updateCheckin(checkinId) {
+        const selectedMood = document.querySelector('.mood-btn.selected');
+        const selectedWeather = Array.from(document.querySelectorAll('.weather-tag.selected'));
+        const comment = document.getElementById('checkin-comment').value.trim();
+
+        const updates = {
+            moodRating: selectedMood ? parseInt(selectedMood.dataset.mood) : null,
+            weatherTags: selectedWeather.map(tag => tag.dataset.weather),
+            comment: comment
+        };
+
+        if (window.gardenStorage.updateCheckin(this.currentDate, checkinId, updates)) {
+            this.clearCheckinForm();
+            this.loadTodaysCheckins();
+            this.resetAddButton();
+            window.showNotification('Check-in updated! ✨', 'success');
+
+            // Trigger PeaceTree lighting if mood was updated
+            if (updates.moodRating && window.PeaceTreeMQTT) {
+                window.PeaceTreeMQTT.setMoodLighting(updates.moodRating);
+            }
+        } else {
+            window.showNotification('Error updating check-in. Please try again.', 'error');
+        }
+    },
+
+    deleteCheckin(checkinId) {
+        if (!confirm('Are you sure you want to delete this check-in?')) return;
+
+        if (window.gardenStorage.deleteCheckin(this.currentDate, checkinId)) {
+            this.loadTodaysCheckins();
+            window.showNotification('Check-in deleted', 'info');
+        } else {
+            window.showNotification('Error deleting check-in. Please try again.', 'error');
+        }
+    },
+
+    clearCheckinForm() {
+        document.querySelectorAll('.mood-btn').forEach(btn => btn.classList.remove('selected'));
+        document.querySelectorAll('.weather-tag').forEach(tag => tag.classList.remove('selected'));
+        document.getElementById('checkin-comment').value = '';
+    },
+
+    resetAddButton() {
+        const addBtn = document.querySelector('.checkin-btn');
+        addBtn.innerHTML = '<i class="fas fa-plus"></i> Add Check-in';
+        addBtn.onclick = () => this.addCheckin();
+    },
+
+    renderCheckin(checkin) {
+        const time = new Date(checkin.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const moodDisplay = checkin.moodRating ? `${checkin.moodRating}/10` : '';
+        const weatherDisplay = checkin.weatherTags.length > 0 ?
+            checkin.weatherTags.map(w => this.getWeatherEmoji(w)).join(' ') : '';
+        const comment = checkin.comment || '';
+
+        return `
+            <div class="checkin-item" data-checkin-id="${checkin.id}">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="width: 90px; font-weight: bold; padding: 5px 10px 5px 0;">${time}</td>
+                        <td style="width: 50px; text-align: center; padding: 5px;">${moodDisplay}</td>
+                        <td style="width: 60px; text-align: center; padding: 5px;">${weatherDisplay}</td>
+                        <td style="padding: 5px; flex: 1;">${comment}</td>
+                        <td style="width: 60px; text-align: right; padding: 5px;">
+                            <div class="checkin-actions">
+                                <button onclick="DailyLogPage.editCheckin(${checkin.id})" title="Edit">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="DailyLogPage.deleteCheckin(${checkin.id})" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        `;
+    },
+
+    getWeatherEmoji(weather) {
+        const emojis = {
+            sunny: '☀️', cloudy: '☁️', stormy: '⛈️',
+            foggy: '🌫️', windy: '💨', calm: '🌅'
+        };
+        return emojis[weather] || '🌤️';
     },
 
     changeDate(direction) {
@@ -341,12 +508,17 @@ const DailyLogPage = {
 
         seedsList.appendChild(seedElement);
         input.value = '';
+
+        // Auto-save after adding seed
+        this.autoSaveLog();
     },
 
     removeSeed(seedId) {
         const seedElement = document.querySelector(`[data-seed-id="${seedId}"]`);
         if (seedElement) {
             seedElement.remove();
+            // Auto-save after removing seed
+            this.autoSaveLog();
         }
     },
 
@@ -370,20 +542,64 @@ const DailyLogPage = {
 
         gratitudeList.appendChild(gratitudeElement);
         input.value = '';
+
+        // Auto-save after adding gratitude
+        this.autoSaveLog();
     },
 
     removeGratitude(gratitudeId) {
         const gratitudeElement = document.querySelector(`[data-gratitude-id="${gratitudeId}"]`);
         if (gratitudeElement) {
             gratitudeElement.remove();
+            // Auto-save after removing gratitude
+            this.autoSaveLog();
         }
     },
 
-    loadTodaysLog() {
+    loadTodaysCheckins() {
+        const checkinsContainer = document.getElementById('checkins-list');
+        if (!checkinsContainer) return;
+
+        // Always clear the container first
+        checkinsContainer.innerHTML = '';
+
+        const checkins = window.gardenStorage.getCheckins(this.currentDate);
+
+        if (checkins.length === 0) {
+            checkinsContainer.innerHTML = '<p style="color: #999; font-style: italic;">No check-ins yet today</p>';
+            return;
+        }
+
+        // Add table header
+        const headerHtml = `
+            <div class="checkins-header" style="border-bottom: 1px solid #ddd; margin-bottom: 5px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="color: #666; font-size: 0.85rem; font-weight: bold;">
+                        <td style="width: 90px; padding: 5px 10px 5px 0;">Time</td>
+                        <td style="width: 50px; text-align: center; padding: 5px;">Mood</td>
+                        <td style="width: 60px; text-align: center; padding: 5px;">Weather</td>
+                        <td style="padding: 5px; flex: 1;">Comment</td>
+                        <td style="width: 60px; text-align: right; padding: 5px;">Actions</td>
+                    </tr>
+                </table>
+            </div>
+        `;
+
+        const checkinsHtml = checkins
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .map(checkin => this.renderCheckin(checkin))
+            .join('');
+
+        checkinsContainer.innerHTML = headerHtml + checkinsHtml;
+    }, loadTodaysLog() {
+        // Always load check-ins first (this will clear the display even if no data)
+        this.loadTodaysCheckins();
+
         const logData = window.gardenStorage.getDailyLog(this.currentDate);
         if (!logData) return;
 
-        if (logData.moodRating) {
+        // Legacy mood/weather loading for older data
+        if (logData.moodRating && !logData.checkins) {
             const moodBtn = document.querySelector(`[data-mood="${logData.moodRating}"]`);
             if (moodBtn) {
                 document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('selected'));
@@ -396,7 +612,7 @@ const DailyLogPage = {
             }
         }
 
-        if (logData.weatherTags) {
+        if (logData.weatherTags && !logData.checkins) {
             logData.weatherTags.forEach(weather => {
                 const tag = document.querySelector(`[data-weather="${weather}"]`);
                 if (tag) tag.classList.add('selected');
@@ -451,18 +667,29 @@ const DailyLogPage = {
         }
     },
 
-    saveLog() {
+    autoSaveLog() {
+        // Auto-save only activities and observations (check-ins are saved separately)
+        this.saveLog(true); // Pass true to indicate this is an auto-save
+    },
+
+    saveLog(isAutoSave = false) {
+        // Get existing log data to preserve check-ins
+        const existingLog = window.gardenStorage.getDailyLog(this.currentDate) || {};
+
         // Create timestamp for the date being edited, not current time
         const logDateTime = new Date(this.currentDate + 'T12:00:00');
         const logTimestamp = logDateTime.toISOString();
 
         const logData = {
             date: this.currentDate,
-            timestamp: logTimestamp,
-            moodRating: document.querySelector('.mood-btn.selected')?.dataset.mood || null,
-            weatherTags: Array.from(document.querySelectorAll('.weather-tag.selected')).map(tag => tag.dataset.weather),
+            timestamp: existingLog.timestamp || logTimestamp,
+            // Preserve existing check-ins
+            checkins: existingLog.checkins || [],
+            // Update activities
             activities: {},
+            // Update observations
             observations: document.getElementById('observations').value.trim(),
+            // Update seeds and gratitude from DOM
             seeds: Array.from(document.querySelectorAll('.seed-item')).map(item => ({
                 id: parseInt(item.dataset.seedId),
                 text: item.querySelector('span').textContent.replace('🌱 ', ''),
@@ -477,7 +704,8 @@ const DailyLogPage = {
 
         document.querySelectorAll('.activity-item input[type="checkbox"]').forEach(checkbox => {
             const activity = checkbox.dataset.activity;
-            const duration = document.getElementById(`${activity}-duration`).value;
+            const durationInput = document.getElementById(`${activity}-duration`);
+            const duration = durationInput ? durationInput.value : '';
             logData.activities[activity] = {
                 completed: checkbox.checked,
                 duration: duration ? parseInt(duration) : 0
@@ -485,11 +713,13 @@ const DailyLogPage = {
         });
 
         if (window.gardenStorage.saveDailyLog(this.currentDate, logData)) {
-            window.showNotification('🌱 Daily log saved successfully!');
+            if (!isAutoSave) {
+                window.showNotification('🌱 Daily log saved successfully!');
+            }
             if (window.gardenApp && window.gardenApp.currentPage === 'home') {
                 window.gardenApp.updateGrowthStats();
             }
-        } else {
+        } else if (!isAutoSave) {
             window.showNotification('❌ Error saving log. Please try again.', 'error');
         }
     }
