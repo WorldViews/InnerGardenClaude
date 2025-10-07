@@ -18,7 +18,7 @@ A beautiful, metaphor-rich personal development web application that helps you c
 ### 📊 **Data Management**
 - **Local Storage**: All data stored securely in your browser
 - **Export/Import**: JSON backup and restore functionality
-- **Multiple Export Formats**: PDF, RTF, and HTML journal exports
+- **Multiple Export Formats**: HTML journal exports
 - **Data Validation**: Robust error handling and data integrity checks
 
 ### 🎨 **Visual Experience**
@@ -138,7 +138,7 @@ Watch your growth bloom:
 Comprehensive view of your journey:
 - **Unified Timeline**: All entries in chronological order
 - **Smart Filtering**: By type, date range, content length
-- **Export Options**: PDF, RTF, HTML formats
+- **Export Options**: HTML format
 - **Statistics**: Word counts, entry analysis, growth metrics
 - **Search & Sort**: Find specific entries quickly
 
@@ -171,7 +171,7 @@ gardenVisualization.addFlower(type, data)
 
 // Export
 completeJournal.exportToPDF()
-completeJournal.exportToRTF()
+completeJournal.exportToHTML()
 ```
 
 ### Adding New Features

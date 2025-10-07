@@ -27,14 +27,6 @@ const CompleteJournalPage = {
                 <div class="export-section" style="background: white; padding: 20px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
                     <h3 style="color: #2c3e50; margin-bottom: 15px;"><i class="fas fa-file-export"></i> Export Your Journal</h3>
                     <div style="display: flex; gap: 15px; justify-content: center; flex-wrap: wrap; margin-bottom: 15px;">
-                        <button onclick="CompleteJournalPage.exportToPDF()" 
-                                style="background: #e74c3c; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                            <i class="fas fa-file-pdf"></i> Export to PDF
-                        </button>
-                        <button onclick="CompleteJournalPage.exportToRTF()" 
-                                style="background: #3498db; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
-                            <i class="fas fa-file-word"></i> Export to RTF
-                        </button>
                         <button onclick="CompleteJournalPage.exportToHTML()" 
                                 style="background: #27ae60; color: white; border: none; padding: 12px 20px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-code"></i> Export to HTML
@@ -276,16 +268,18 @@ const CompleteJournalPage = {
     },
 
     formatWisdomContent(weed) {
-        return `Situation: ${weed.situation}
+        if (!weed) return 'Invalid wisdom entry';
 
-Original Thought: "${weed.originalThought}"
-Belief Intensity: ${weed.beliefIntensity}%
+        return `Situation: ${weed.situation || 'Not specified'}
 
-Balanced Thought: "${weed.balancedThought}"
-New Belief Intensity: ${weed.newBeliefIntensity}%
+Original Thought: "${weed.originalThought || 'Not recorded'}"
+Belief Intensity: ${weed.beliefIntensity || 0}%
 
-Emotions: ${weed.emotions.join(', ')}
-Emotional Intensity: ${weed.emotionIntensity} → ${weed.newEmotionIntensity}
+Balanced Thought: "${weed.balancedThought || 'Not recorded'}"
+New Belief Intensity: ${weed.newBeliefIntensity || 0}%
+
+Emotions: ${(weed.emotions && weed.emotions.length > 0) ? weed.emotions.join(', ') : 'Not specified'}
+Emotional Intensity: ${weed.emotionIntensity || 0} → ${weed.newEmotionIntensity || 0}
 
 ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
     },
@@ -695,159 +689,6 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
         `;
     },
 
-    exportToPDF() {
-        window.showNotification('🔄 Generating PDF...', 'info');
-
-        // Use jsPDF library for PDF generation
-        this.loadjsPDF().then(() => {
-            const { jsPDF } = window;
-            const pdf = new jsPDF();
-
-            this.generatePDFContent(pdf);
-
-            const filename = `inner-garden-journal-${new Date().toISOString().split('T')[0]}.pdf`;
-            pdf.save(filename);
-
-            window.showNotification('📄 PDF journal exported successfully!');
-        }).catch(error => {
-            console.error('Error loading jsPDF:', error);
-            window.showNotification('❌ Error generating PDF. Falling back to HTML export.', 'error');
-            this.exportToHTML();
-        });
-    },
-
-    loadjsPDF() {
-        return new Promise((resolve, reject) => {
-            if (window.jsPDF) {
-                resolve();
-                return;
-            }
-
-            const script = document.createElement('script');
-            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
-    },
-
-    generatePDFContent(pdf) {
-        let yPosition = 20;
-        const pageHeight = pdf.internal.pageSize.height;
-        const pageWidth = pdf.internal.pageSize.width;
-        const margin = 20;
-        const lineHeight = 6;
-
-        // Title
-        pdf.setFontSize(20);
-        pdf.setFont(undefined, 'bold');
-        pdf.text('🌱 Inner Garden Journal', margin, yPosition);
-        yPosition += 15;
-
-        // Date range
-        pdf.setFontSize(12);
-        pdf.setFont(undefined, 'normal');
-        pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, margin, yPosition);
-        yPosition += 10;
-
-        if (this.filteredEntries.length > 0) {
-            const oldestEntry = this.filteredEntries[this.filteredEntries.length - 1];
-            const newestEntry = this.filteredEntries[0];
-            pdf.text(`Entries from: ${new Date(oldestEntry.timestamp).toLocaleDateString()} to ${new Date(newestEntry.timestamp).toLocaleDateString()}`, margin, yPosition);
-            yPosition += 15;
-        }
-
-        // Summary statistics
-        if (document.getElementById('include-stats').checked) {
-            pdf.setFont(undefined, 'bold');
-            pdf.text('Summary Statistics:', margin, yPosition);
-            yPosition += 8;
-
-            pdf.setFont(undefined, 'normal');
-            pdf.text(`Total Entries: ${this.filteredEntries.length}`, margin, yPosition);
-            yPosition += 6;
-
-            const totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
-            pdf.text(`Total Words: ${totalWords.toLocaleString()}`, margin, yPosition);
-            yPosition += 15;
-        }
-
-        // Entries
-        this.filteredEntries.forEach((entry, index) => {
-            // Check if we need a new page
-            if (yPosition > pageHeight - 50) {
-                pdf.addPage();
-                yPosition = 20;
-            }
-
-            // Entry header
-            pdf.setFont(undefined, 'bold');
-            pdf.setFontSize(14);
-            pdf.text(`${entry.title}`, margin, yPosition);
-            yPosition += 8;
-
-            pdf.setFont(undefined, 'normal');
-            pdf.setFontSize(10);
-            pdf.text(`${new Date(entry.timestamp).toLocaleDateString()} - ${entry.type}`, margin, yPosition);
-            yPosition += 8;
-
-            // Entry content
-            pdf.setFontSize(11);
-            const lines = pdf.splitTextToSize(entry.content, pageWidth - 2 * margin);
-            lines.forEach(line => {
-                if (yPosition > pageHeight - 20) {
-                    pdf.addPage();
-                    yPosition = 20;
-                }
-                pdf.text(line, margin, yPosition);
-                yPosition += lineHeight;
-            });
-
-            yPosition += 10; // Space between entries
-        });
-    },
-
-    exportToRTF() {
-        const rtfContent = this.generateRTFContent();
-        this.downloadFile(rtfContent, `inner-garden-journal-${new Date().toISOString().split('T')[0]}.rtf`, 'application/rtf');
-        window.showNotification('📝 RTF journal exported successfully!');
-    },
-
-    generateRTFContent() {
-        let rtf = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
-
-        // Title
-        rtf += '\\f0\\fs36\\b Inner Garden Journal\\b0\\fs24\\par\\par';
-
-        // Date
-        rtf += `Generated on: ${new Date().toLocaleDateString()}\\par\\par`;
-
-        // Summary
-        if (document.getElementById('include-stats').checked) {
-            rtf += '\\b Summary Statistics:\\b0\\par';
-            rtf += `Total Entries: ${this.filteredEntries.length}\\par`;
-            const totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
-            rtf += `Total Words: ${totalWords.toLocaleString()}\\par\\par`;
-        }
-
-        // Entries
-        this.filteredEntries.forEach(entry => {
-            rtf += '\\b\\fs28 ' + this.escapeRTF(entry.title) + '\\b0\\fs24\\par';
-            rtf += `${new Date(entry.timestamp).toLocaleDateString()} - ${entry.type}\\par`;
-            rtf += this.escapeRTF(entry.content) + '\\par\\par';
-        });
-
-        rtf += '}';
-        return rtf;
-    },
-
-    escapeRTF(text) {
-        return text.replace(/\\/g, '\\\\')
-            .replace(/\{/g, '\\{')
-            .replace(/\}/g, '\\}')
-            .replace(/\n/g, '\\par ');
-    },
-
     exportToHTML() {
         const htmlContent = this.generateHTMLContent();
         this.downloadFile(htmlContent, `inner-garden-journal-${new Date().toISOString().split('T')[0]}.html`, 'text/html');
@@ -856,7 +697,7 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
 
     generateHTMLContent() {
         const includeStats = document.getElementById('include-stats').checked;
-        const includeInsights = document.getElementById('include-insights').checked;
+        const filter = document.getElementById('entry-filter').value;
 
         let html = `<!DOCTYPE html>
 <html lang="en">
@@ -865,18 +706,76 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inner Garden Journal</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .entry { margin-bottom: 30px; padding: 20px; border-left: 4px solid #3498db; background: #f8f9fa; }
-        .entry-title { font-size: 1.2em; font-weight: bold; margin-bottom: 10px; }
-        .entry-meta { color: #666; font-size: 0.9em; margin-bottom: 15px; }
-        .entry-content { white-space: pre-wrap; }
-        .stats { background: #e8f4f8; padding: 20px; margin: 20px 0; border-radius: 8px; }
-        .type-daily-logs { border-left-color: #3498db; }
-        .type-goals { border-left-color: #27ae60; }
-        .type-gratitude { border-left-color: #e74c3c; }
-        .type-wisdom { border-left-color: #9b59b6; }
-        .type-observations { border-left-color: #f39c12; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            max-width: 900px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            line-height: 1.6; 
+            background: #f8f9fa;
+        }
+        .header { 
+            text-align: center; 
+            margin-bottom: 30px; 
+            background: white; 
+            padding: 30px; 
+            border-radius: 15px; 
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .stats { 
+            background: white; 
+            padding: 20px; 
+            margin: 20px 0; 
+            border-radius: 15px; 
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .day-section { 
+            margin-bottom: 30px; 
+            border: 1px solid #e0e0e0; 
+            border-radius: 12px; 
+            overflow: hidden;
+            background: white;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        .day-header { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            color: white; 
+            padding: 15px; 
+            font-size: 1.2rem; 
+            font-weight: bold;
+        }
+        .day-content { 
+            padding: 20px; 
+        }
+        .type-section { 
+            margin-bottom: 20px; 
+        }
+        .type-title { 
+            color: #2c3e50; 
+            margin-bottom: 10px; 
+            font-size: 1rem; 
+            border-bottom: 2px solid #ecf0f1; 
+            padding-bottom: 5px; 
+            font-weight: bold;
+        }
+        .type-entries { 
+            margin-left: 15px; 
+        }
+        .type-entry { 
+            margin-bottom: 8px; 
+            padding: 8px; 
+            background: #f8f9fa; 
+            border-radius: 6px; 
+        }
+        .checkin-entry { border-left: 3px solid #3498db; }
+        .goal-entry { border-left: 3px solid #27ae60; }
+        .activity-entry { border-left: 3px solid #f39c12; }
+        .gratitude-entry { border-left: 3px solid #e74c3c; }
+        .observation-entry { border-left: 3px solid #f39c12; padding: 12px; }
+        .wisdom-entry { border-left: 3px solid #9b59b6; padding: 12px; }
+        .entry-time { font-weight: bold; color: #666; }
+        .observation-content, .wisdom-content { white-space: pre-wrap; line-height: 1.5; }
+        .wisdom-title { font-weight: bold; color: #9b59b6; margin-bottom: 5px; }
     </style>
 </head>
 <body>`;
@@ -884,31 +783,293 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
         html += `<div class="header">
             <h1>🌱 Inner Garden Journal</h1>
             <p>Generated on: ${new Date().toLocaleDateString()}</p>
+            <p><em>${filter === 'complete-journal' ? 'Complete Journal by Day' : 'Filtered Entries'}</em></p>
         </div>`;
 
         if (includeStats) {
-            const totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
+            let totalWords = 0;
+            if (filter === 'complete-journal') {
+                // Calculate words from complete journal format
+                const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
+                Object.values(dailyLogs).forEach(log => {
+                    if (log.observations) totalWords += log.observations.split(/\s+/).length;
+                    if (log.checkins) {
+                        log.checkins.forEach(checkin => {
+                            if (checkin.comment) totalWords += checkin.comment.split(/\s+/).length;
+                        });
+                    }
+                    if (log.seeds) {
+                        log.seeds.forEach(seed => totalWords += seed.text.split(/\s+/).length);
+                    }
+                    if (log.gratitude) {
+                        log.gratitude.forEach(g => totalWords += g.text.split(/\s+/).length);
+                    }
+                });
+
+                // Add wisdom entries word count
+                const weedTracker = window.gardenStorage.getSection('weedTracker') || {};
+                Object.values(weedTracker).forEach(weed => {
+                    const wisdomContent = this.formatWisdomContent(weed);
+                    totalWords += wisdomContent.split(/\s+/).length;
+                });
+            } else {
+                totalWords = this.filteredEntries.reduce((sum, entry) => sum + entry.content.split(/\s+/).length, 0);
+            }
+
             html += `<div class="stats">
-                <h3>Summary Statistics</h3>
-                <p><strong>Total Entries:</strong> ${this.filteredEntries.length}</p>
-                <p><strong>Total Words:</strong> ${totalWords.toLocaleString()}</p>
-                <p><strong>Date Range:</strong> ${this.filteredEntries.length > 0 ?
-                    new Date(this.filteredEntries[this.filteredEntries.length - 1].timestamp).toLocaleDateString() +
-                    ' to ' +
-                    new Date(this.filteredEntries[0].timestamp).toLocaleDateString() : 'No entries'}</p>
+                <h3>Summary Statistics</h3>`;
+
+            if (filter === 'complete-journal') {
+                const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
+                const datesWithLogs = Object.keys(dailyLogs).length;
+                html += `<p><strong>Days with Entries:</strong> ${datesWithLogs}</p>`;
+            } else {
+                html += `<p><strong>Total Entries:</strong> ${this.filteredEntries.length}</p>`;
+            }
+
+            html += `<p><strong>Total Words:</strong> ${totalWords.toLocaleString()}</p>
             </div>`;
         }
 
-        this.filteredEntries.forEach(entry => {
-            html += `<div class="entry type-${entry.type}">
-                <div class="entry-title">${this.escapeHTML(entry.title)}</div>
-                <div class="entry-meta">${new Date(entry.timestamp).toLocaleDateString()} - ${entry.type}</div>
-                <div class="entry-content">${this.escapeHTML(entry.content)}</div>
-            </div>`;
-        });
+        // Generate content based on filter type
+        if (filter === 'complete-journal') {
+            html += this.generateCompleteJournalHTML();
+        } else {
+            html += this.generateFilteredEntriesHTML();
+        }
 
         html += '</body></html>';
         return html;
+    },
+
+    generateCompleteJournalHTML() {
+        const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
+        const sort = document.getElementById('entry-sort').value;
+
+        let datesWithLogs = Object.keys(dailyLogs);
+        if (sort === 'date-asc') {
+            datesWithLogs.sort((a, b) => a.localeCompare(b));
+        } else {
+            datesWithLogs.sort((a, b) => b.localeCompare(a));
+        }
+
+        // Apply date range filter
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        const filteredDates = datesWithLogs.filter(date => {
+            if (dateFrom && date < dateFrom) return false;
+            if (dateTo && date > dateTo) return false;
+            return true;
+        });
+
+        let html = '';
+
+        filteredDates.forEach(date => {
+            const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            html += `<div class="day-section">
+                <div class="day-header">📅 ${formattedDate}</div>
+                <div class="day-content">`;
+
+            const dailyLog = window.gardenStorage.getDailyLog(date);
+
+            // Check-ins
+            if (dailyLog && dailyLog.checkins && dailyLog.checkins.length > 0) {
+                html += `<div class="type-section">
+                    <div class="type-title">💭 Check-ins (${dailyLog.checkins.length})</div>
+                    <div class="type-entries">`;
+
+                dailyLog.checkins.forEach(checkin => {
+                    const time = new Date(checkin.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    let checkinText = '';
+                    if (checkin.moodRating) checkinText += `Mood: ${checkin.moodRating}/10`;
+                    if (checkin.weatherTags && checkin.weatherTags.length > 0) {
+                        const weatherEmojis = checkin.weatherTags.map(w => this.getWeatherEmoji(w));
+                        checkinText += `${checkinText ? ' | ' : ''}Weather: ${weatherEmojis.join(' ')}`;
+                    }
+                    if (checkin.comment) checkinText += `${checkinText ? ' | ' : ''}Note: "${this.escapeHTML(checkin.comment)}"`;
+
+                    html += `<div class="type-entry checkin-entry">
+                        <span class="entry-time">${time}</span> - ${checkinText}
+                    </div>`;
+                });
+
+                html += '</div></div>';
+            }
+
+            // Goals & Seeds
+            if (dailyLog && dailyLog.seeds && dailyLog.seeds.length > 0) {
+                html += `<div class="type-section">
+                    <div class="type-title">🌱 Goals & Seeds (${dailyLog.seeds.length})</div>
+                    <div class="type-entries">`;
+
+                dailyLog.seeds.forEach(seed => {
+                    const time = new Date(seed.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    html += `<div class="type-entry goal-entry">
+                        <span class="entry-time">${time}</span> - ${this.escapeHTML(seed.text)}
+                    </div>`;
+                });
+
+                html += '</div></div>';
+            }
+
+            // Activities
+            if (dailyLog && dailyLog.activities) {
+                const completedActivities = Object.entries(dailyLog.activities)
+                    .filter(([, data]) => data.completed);
+
+                if (completedActivities.length > 0) {
+                    html += `<div class="type-section">
+                        <div class="type-title">💪 Activities (${completedActivities.length})</div>
+                        <div class="type-entries">`;
+
+                    completedActivities.forEach(([activity, data]) => {
+                        const emoji = this.getActivityEmoji(activity);
+                        const name = this.formatActivityName(activity);
+                        const durationText = data.duration ? ` (${data.duration} min)` : '';
+
+                        html += `<div class="type-entry activity-entry">
+                            ${emoji} ${name}${durationText}
+                        </div>`;
+                    });
+
+                    html += '</div></div>';
+                }
+            }
+
+            // Gratitude
+            if (dailyLog && dailyLog.gratitude && dailyLog.gratitude.length > 0) {
+                html += `<div class="type-section">
+                    <div class="type-title">🌸 Gratitude (${dailyLog.gratitude.length})</div>
+                    <div class="type-entries">`;
+
+                dailyLog.gratitude.forEach(gratitude => {
+                    const time = new Date(gratitude.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    html += `<div class="type-entry gratitude-entry">
+                        <span class="entry-time">${time}</span> - ${this.escapeHTML(gratitude.text)}
+                    </div>`;
+                });
+
+                html += '</div></div>';
+            }
+
+            // Observations
+            if (dailyLog && dailyLog.observations && dailyLog.observations.trim()) {
+                html += `<div class="type-section">
+                    <div class="type-title">👁️ Observations</div>
+                    <div class="type-entries">
+                        <div class="type-entry observation-entry">
+                            <div class="observation-content">${this.escapeHTML(dailyLog.observations)}</div>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            // Wisdom entries for this date
+            const wisdomEntries = this.getWisdomEntriesForDate(date);
+            if (wisdomEntries.length > 0) {
+                html += `<div class="type-section">
+                    <div class="type-title">🧠 Wisdom Entries (${wisdomEntries.length})</div>
+                    <div class="type-entries">`;
+
+                wisdomEntries.forEach(wisdom => {
+                    const time = new Date(wisdom.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                    const wisdomContent = this.formatWisdomContent(wisdom);
+                    html += `<div class="type-entry wisdom-entry">
+                        <div class="wisdom-title">${time} - Wisdom Transformation</div>
+                        <div class="wisdom-content">${this.escapeHTML(wisdomContent)}</div>
+                    </div>`;
+                });
+
+                html += '</div></div>';
+            }
+
+            html += '</div></div>';
+        });
+
+        return html;
+    },
+
+    getWisdomEntriesForDate(date) {
+        const weedTracker = window.gardenStorage.getSection('weedTracker') || {};
+        return Object.values(weedTracker)
+            .filter(weed => weed && weed.date === date)
+            .map(weed => ({
+                ...weed,
+                timestamp: weed.timestamp || new Date(date + 'T12:00:00').toISOString()
+            }));
+    },
+
+    generateFilteredEntriesHTML() {
+        let html = '';
+
+        this.filteredEntries.forEach(entry => {
+            const typeColors = {
+                'daily-logs': '#3498db',
+                'goals': '#27ae60',
+                'gratitude': '#e74c3c',
+                'wisdom': '#9b59b6',
+                'observations': '#f39c12'
+            };
+
+            html += `<div class="day-section">
+                <div class="day-content">
+                    <div style="border-left: 4px solid ${typeColors[entry.type]}; padding: 15px; background: #f8f9fa; border-radius: 0 8px 8px 0;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                            <h4 style="margin: 0; color: #2c3e50;">${this.escapeHTML(entry.title)}</h4>
+                            <div style="text-align: right; font-size: 0.8rem; color: #7f8c8d;">
+                                <div>${new Date(entry.timestamp).toLocaleDateString()}</div>
+                                <div>${new Date(entry.timestamp).toLocaleTimeString()}</div>
+                            </div>
+                        </div>
+                        <div style="white-space: pre-wrap; line-height: 1.6; color: #333;">
+                            ${this.escapeHTML(entry.content)}
+                        </div>
+                        ${entry.mood ? `<div style="margin-top: 10px; font-size: 0.9rem; color: #7f8c8d;">Mood: ${entry.mood}/10</div>` : ''}
+                        ${entry.improvement ? `<div style="margin-top: 5px; font-size: 0.9rem; color: #7f8c8d;">Growth Score: ${entry.improvement.toFixed(1)}</div>` : ''}
+                    </div>
+                </div>
+            </div>`;
+        });
+
+        return html;
+    },
+
+    getWeatherEmoji(weather) {
+        const emojis = {
+            sunny: '☀️', cloudy: '☁️', stormy: '⛈️',
+            foggy: '🌫️', windy: '💨', calm: '🌅'
+        };
+        return emojis[weather] || '🌤️';
+    },
+
+    getActivityEmoji(activity) {
+        const emojis = {
+            meditation: '🧘',
+            exercise: '🏃',
+            journaling: '📝',
+            reading: '📚',
+            creativity: '🎨',
+            social: '👥'
+        };
+        return emojis[activity] || '✓';
+    },
+
+    formatActivityName(activity) {
+        const names = {
+            meditation: 'Meditation/Mindfulness',
+            exercise: 'Physical Exercise',
+            journaling: 'Journaling',
+            reading: 'Learning/Reading',
+            creativity: 'Creative Expression',
+            social: 'Social Connection'
+        };
+        return names[activity] || activity.charAt(0).toUpperCase() + activity.slice(1);
     },
 
     escapeHTML(text) {

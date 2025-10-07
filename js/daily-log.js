@@ -203,6 +203,14 @@ const DailyLogPage = {
                             <div id="gratitude-list" class="gratitude-list"></div>
                         </div>
                     </div>
+
+                    <div class="log-section">
+                        <h3><i class="fas fa-brain"></i> Wisdom Transformations</h3>
+                        <p style="color: #666; font-size: 0.9rem; margin-bottom: 15px;">Today's insights from transforming challenges into wisdom</p>
+                        <div id="wisdom-list" class="wisdom-list">
+                            <!-- Wisdom entries will be loaded here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -319,6 +327,9 @@ const DailyLogPage = {
 
         // Clear gratitude list
         document.getElementById('gratitude-list').innerHTML = '';
+
+        // Clear wisdom list
+        document.getElementById('wisdom-list').innerHTML = '';
 
         // Clear input fields
         document.getElementById('new-seed').value = '';
@@ -591,9 +602,79 @@ const DailyLogPage = {
             .join('');
 
         checkinsContainer.innerHTML = headerHtml + checkinsHtml;
+    },
+
+    loadTodaysWisdom() {
+        const wisdomContainer = document.getElementById('wisdom-list');
+        if (!wisdomContainer) return;
+
+        // Always clear the container first
+        wisdomContainer.innerHTML = '';
+
+        const weedTracker = window.gardenStorage.getSection('weedTracker') || {};
+        const wisdomEntries = Object.values(weedTracker).filter(weed => weed && weed.date === this.currentDate);
+
+        if (wisdomEntries.length === 0) {
+            wisdomContainer.innerHTML = '<p style="color: #999; font-style: italic;">No wisdom transformations yet today</p>';
+            return;
+        }
+
+        const wisdomHtml = wisdomEntries
+            .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+            .map(wisdom => this.renderWisdom(wisdom))
+            .join('');
+
+        wisdomContainer.innerHTML = wisdomHtml;
+    },
+
+    renderWisdom(wisdom) {
+        const time = new Date(wisdom.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const situation = wisdom.situation || 'Not specified';
+        const originalThought = wisdom.originalThought || 'Not recorded';
+        const balancedThought = wisdom.balancedThought || 'Not recorded';
+
+        return `
+            <div class="wisdom-item" style="background: #f8f4ff; border-left: 4px solid #9b59b6; padding: 15px; margin-bottom: 10px; border-radius: 8px;">
+                <div style="display: flex; justify-content: between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="flex: 1;">
+                        <div style="font-weight: bold; color: #9b59b6; margin-bottom: 5px;">
+                            ${time} - Wisdom Transformation
+                        </div>
+                        <div style="font-size: 0.9rem; color: #666; margin-bottom: 8px;">
+                            <strong>Situation:</strong> ${situation}
+                        </div>
+                    </div>
+                </div>
+                <div style="font-size: 0.9rem; line-height: 1.4;">
+                    <div style="margin-bottom: 8px;">
+                        <strong>Original Thought:</strong> "${originalThought}"
+                        ${wisdom.beliefIntensity ? `<span style="color: #e74c3c; font-weight: bold;"> (${wisdom.beliefIntensity}%)</span>` : ''}
+                    </div>
+                    <div style="margin-bottom: 8px;">
+                        <strong>Balanced Thought:</strong> "${balancedThought}"
+                        ${wisdom.newBeliefIntensity ? `<span style="color: #27ae60; font-weight: bold;"> (${wisdom.newBeliefIntensity}%)</span>` : ''}
+                    </div>
+                    ${wisdom.emotions && wisdom.emotions.length > 0 ? `
+                        <div style="margin-bottom: 8px;">
+                            <strong>Emotions:</strong> ${wisdom.emotions.join(', ')}
+                            ${wisdom.emotionIntensity && wisdom.newEmotionIntensity ?
+                    `<span style="color: #f39c12;"> (${wisdom.emotionIntensity} → ${wisdom.newEmotionIntensity})</span>` : ''}
+                        </div>
+                    ` : ''}
+                    ${wisdom.actionPlan ? `
+                        <div style="margin-top: 10px; padding: 8px; background: rgba(155, 89, 182, 0.1); border-radius: 4px;">
+                            <strong>Action Plan:</strong> ${wisdom.actionPlan}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
     }, loadTodaysLog() {
         // Always load check-ins first (this will clear the display even if no data)
         this.loadTodaysCheckins();
+
+        // Load wisdom entries for today
+        this.loadTodaysWisdom();
 
         const logData = window.gardenStorage.getDailyLog(this.currentDate);
         if (!logData) return;
