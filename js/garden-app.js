@@ -141,6 +141,13 @@ class GardenApp {
                     window.CompleteJournalPage.init();
                 }
                 break;
+            case 'garden-insights':
+                if (window.GardenInsightsPage) {
+                    window.GardenInsightsPage.init();
+                } else {
+                    this.renderPlaceholderPage(pageId);
+                }
+                break;
             default:
                 this.renderPlaceholderPage(pageId);
                 break;

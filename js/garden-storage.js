@@ -277,21 +277,45 @@ class GardenStorage {
         const today = new Date().toISOString().split('T')[0];
         const sortedDates = Object.keys(dailyLogs).sort().reverse();
 
-        let streak = 0;
-        let currentDate = today;
+        if (sortedDates.length === 0) return 0;
 
-        for (let date of sortedDates) {
-            if (date === currentDate) {
-                streak++;
-                const prevDate = new Date(currentDate);
-                prevDate.setDate(prevDate.getDate() - 1);
-                currentDate = prevDate.toISOString().split('T')[0];
+        let streak = 0;
+        let checkDate = today;
+
+        // Check if there's a log for today
+        if (dailyLogs[today]) {
+            streak = 1;
+            checkDate = this.getPreviousDate(today);
+        } else {
+            // If no log for today, start checking from yesterday
+            checkDate = this.getPreviousDate(today);
+            // If there's a log for yesterday, start the streak from there
+            if (dailyLogs[checkDate]) {
+                streak = 1;
+                checkDate = this.getPreviousDate(checkDate);
             } else {
+                return 0; // No recent activity
+            }
+        }
+
+        // Continue checking previous days
+        for (let date of sortedDates) {
+            if (date === checkDate) {
+                streak++;
+                checkDate = this.getPreviousDate(checkDate);
+            } else if (date < checkDate) {
+                // We've found a gap in the logs
                 break;
             }
         }
 
         return streak;
+    }
+
+    getPreviousDate(dateString) {
+        const date = new Date(dateString);
+        date.setDate(date.getDate() - 1);
+        return date.toISOString().split('T')[0];
     }
 
     calculateWellnessScore(dailyLogs) {

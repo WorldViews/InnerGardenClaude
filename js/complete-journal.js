@@ -58,6 +58,7 @@ const CompleteJournalPage = {
                         <div>
                             <label style="display: block; margin-bottom: 5px; font-weight: bold;">Filter by Type:</label>
                             <select id="entry-filter" style="width: 100%; padding: 8px; border: 2px solid #ddd; border-radius: 8px;">
+                                <option value="complete-journal">Complete Journal</option>
                                 <option value="all">All Entries</option>
                                 <option value="daily-logs">Daily Logs</option>
                                 <option value="goals">Goals & Seeds</option>
@@ -197,6 +198,11 @@ const CompleteJournalPage = {
         });
 
         this.filteredEntries = [...this.allEntries];
+
+        // Set default filter to "complete-journal"
+        document.getElementById('entry-filter').value = 'complete-journal';
+        this.currentFilter = 'complete-journal';
+
         this.applyFilters();
     },
 
@@ -295,7 +301,7 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
 
         // Filter by type
         this.filteredEntries = this.allEntries.filter(entry => {
-            if (filter !== 'all' && entry.type !== filter) return false;
+            if (filter !== 'all' && filter !== 'complete-journal' && entry.type !== filter) return false;
 
             // Date range filter
             if (dateFrom && entry.date < dateFrom) return false;
@@ -321,11 +327,17 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
         });
 
         this.renderSummary();
-        this.renderEntries();
+
+        // Use special rendering for complete journal view
+        if (filter === 'complete-journal') {
+            this.renderCompleteJournal();
+        } else {
+            this.renderEntries();
+        }
     },
 
     clearFilters() {
-        document.getElementById('entry-filter').value = 'all';
+        document.getElementById('entry-filter').value = 'complete-journal';
         document.getElementById('entry-sort').value = 'date-desc';
         document.getElementById('date-from').value = '';
         document.getElementById('date-to').value = '';
@@ -379,6 +391,253 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
         `;
 
         document.getElementById('journal-summary').innerHTML = summaryHtml;
+    },
+
+    renderCompleteJournal() {
+        // Group entries by date and get only days that have daily log entries
+        const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
+        const sort = document.getElementById('entry-sort').value;
+
+        // Sort dates based on user selection
+        let datesWithLogs = Object.keys(dailyLogs);
+        if (sort === 'date-asc') {
+            datesWithLogs.sort((a, b) => a.localeCompare(b)); // Ascending order (oldest first)
+        } else {
+            datesWithLogs.sort((a, b) => b.localeCompare(a)); // Descending order (newest first) - default
+        }
+
+        // Apply date range filter to the dates
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+
+        const filteredDates = datesWithLogs.filter(date => {
+            if (dateFrom && date < dateFrom) return false;
+            if (dateTo && date > dateTo) return false;
+            return true;
+        }); let journalHtml = '';
+
+        if (filteredDates.length === 0) {
+            journalHtml = '<p style="text-align: center; color: #7f8c8d; padding: 40px;">No daily log entries found in the selected date range.</p>';
+        } else {
+            filteredDates.forEach(date => {
+                const dayEntries = this.getEntriesForDate(date);
+                if (dayEntries.length > 0) {
+                    journalHtml += this.renderDaySection(date, dayEntries);
+                }
+            });
+        }
+
+        document.getElementById('journal-entries').innerHTML = `
+            <div style="background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);">
+                <h3 style="color: #2c3e50; margin-bottom: 20px;">
+                    <i class="fas fa-calendar-alt"></i> Complete Journal by Day
+                    <span style="font-size: 0.8rem; color: #7f8c8d;">(${filteredDates.length} days)</span>
+                </h3>
+                ${journalHtml}
+            </div>
+        `;
+    },
+
+    getEntriesForDate(date) {
+        // Get all entries for a specific date and sort by timestamp
+        const dayEntries = this.allEntries.filter(entry => entry.date === date);
+
+        // Sort by timestamp within the day
+        dayEntries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        return dayEntries;
+    },
+
+    renderDaySection(date, dayEntries) {
+        const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+
+        // Group entries by type
+        const entriesByType = {
+            'checkins': [],
+            'goals': [],
+            'gratitude': [],
+            'observations': [],
+            'wisdom': [],
+            'activities': []
+        };
+
+        // Get the daily log for this date to extract check-ins and activities
+        const dailyLog = window.gardenStorage.getDailyLog(date);
+
+        dayEntries.forEach(entry => {
+            switch (entry.type) {
+                case 'goals':
+                    entriesByType.goals.push(entry);
+                    break;
+                case 'gratitude':
+                    entriesByType.gratitude.push(entry);
+                    break;
+                case 'observations':
+                    entriesByType.observations.push(entry);
+                    break;
+                case 'wisdom':
+                    entriesByType.wisdom.push(entry);
+                    break;
+            }
+        });
+
+        // Extract check-ins from daily log
+        if (dailyLog && dailyLog.checkins && dailyLog.checkins.length > 0) {
+            entriesByType.checkins = dailyLog.checkins.sort((a, b) =>
+                new Date(a.timestamp) - new Date(b.timestamp)
+            );
+        }
+
+        // Extract activities from daily log
+        if (dailyLog && dailyLog.activities) {
+            const completedActivities = Object.entries(dailyLog.activities)
+                .filter(([, data]) => data.completed)
+                .map(([activity, data]) => ({
+                    name: activity,
+                    duration: data.duration,
+                    timestamp: dailyLog.timestamp
+                }));
+            if (completedActivities.length > 0) {
+                entriesByType.activities = completedActivities;
+            }
+        }
+
+        let dayHtml = `
+            <div style="margin-bottom: 30px; border: 1px solid #e0e0e0; border-radius: 12px; overflow: hidden;">
+                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px;">
+                    <h4 style="margin: 0; font-size: 1.2rem;">📅 ${formattedDate}</h4>
+                </div>
+                <div style="padding: 20px;">
+        `;
+
+        // Render each type section only if there are entries
+        dayHtml += this.renderTypeSection('Check-ins', '💭', entriesByType.checkins, 'checkin');
+        dayHtml += this.renderTypeSection('Goals & Seeds', '🌱', entriesByType.goals, 'goal');
+        dayHtml += this.renderTypeSection('Activities', '💪', entriesByType.activities, 'activity');
+        dayHtml += this.renderTypeSection('Gratitude', '🌸', entriesByType.gratitude, 'gratitude');
+        dayHtml += this.renderTypeSection('Observations', '👁️', entriesByType.observations, 'observation');
+        dayHtml += this.renderTypeSection('Wisdom Entries', '🧠', entriesByType.wisdom, 'wisdom');
+
+        dayHtml += '</div></div>';
+
+        return dayHtml;
+    },
+
+    renderTypeSection(title, icon, entries, type) {
+        if (!entries || entries.length === 0) {
+            return ''; // Don't show section if no entries
+        }
+
+        let sectionHtml = `
+            <div style="margin-bottom: 20px;">
+                <h5 style="color: #2c3e50; margin-bottom: 10px; font-size: 1rem; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px;">
+                    ${icon} ${title} (${entries.length})
+                </h5>
+                <div style="margin-left: 15px;">
+        `;
+
+        entries.forEach(entry => {
+            sectionHtml += this.renderTypeEntry(entry, type);
+        });
+
+        sectionHtml += '</div></div>';
+        return sectionHtml;
+    },
+
+    renderTypeEntry(entry, type) {
+        const time = entry.timestamp ? new Date(entry.timestamp).toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit'
+        }) : '';
+
+        switch (type) {
+            case 'checkin':
+                let checkinText = '';
+                if (entry.moodRating) {
+                    checkinText += `Mood: ${entry.moodRating}/10`;
+                }
+                if (entry.weatherTags && entry.weatherTags.length > 0) {
+                    const weatherEmojis = entry.weatherTags.map(w => this.getWeatherEmoji(w));
+                    checkinText += `${checkinText ? ' | ' : ''}Weather: ${weatherEmojis.join(' ')}`;
+                }
+                if (entry.comment) {
+                    checkinText += `${checkinText ? ' | ' : ''}Note: "${entry.comment}"`;
+                }
+                return `
+                    <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #3498db;">
+                        <span style="font-weight: bold; color: #666;">${time}</span> - ${checkinText}
+                    </div>
+                `;
+
+            case 'goal':
+                return `
+                    <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #27ae60;">
+                        <span style="font-weight: bold; color: #666;">${time}</span> - ${entry.content}
+                    </div>
+                `;
+
+            case 'activity':
+                const durationText = entry.duration ? ` (${entry.duration} min)` : '';
+                return `
+                    <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #f39c12;">
+                        ${this.getActivityEmoji(entry.name)} ${this.formatActivityName(entry.name)}${durationText}
+                    </div>
+                `;
+
+            case 'gratitude':
+                return `
+                    <div style="margin-bottom: 8px; padding: 8px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #e74c3c;">
+                        <span style="font-weight: bold; color: #666;">${time}</span> - ${entry.content}
+                    </div>
+                `;
+
+            case 'observation':
+                return `
+                    <div style="margin-bottom: 8px; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #f39c12;">
+                        <div style="white-space: pre-wrap; line-height: 1.5;">${entry.content}</div>
+                    </div>
+                `;
+
+            case 'wisdom':
+                return `
+                    <div style="margin-bottom: 8px; padding: 12px; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #9b59b6;">
+                        <div style="font-weight: bold; color: #9b59b6; margin-bottom: 5px;">Wisdom Transformation</div>
+                        <div style="white-space: pre-wrap; line-height: 1.5; font-size: 0.9rem;">${entry.content}</div>
+                    </div>
+                `;
+
+            default:
+                return '';
+        }
+    },
+
+    getActivityEmoji(activity) {
+        const emojis = {
+            meditation: '🧘',
+            exercise: '🏃',
+            journaling: '📝',
+            reading: '📚',
+            creativity: '🎨',
+            social: '👥'
+        };
+        return emojis[activity] || '✓';
+    },
+
+    formatActivityName(activity) {
+        const names = {
+            meditation: 'Meditation/Mindfulness',
+            exercise: 'Physical Exercise',
+            journaling: 'Journaling',
+            reading: 'Learning/Reading',
+            creativity: 'Creative Expression',
+            social: 'Social Connection'
+        };
+        return names[activity] || activity.charAt(0).toUpperCase() + activity.slice(1);
     },
 
     renderEntries() {
