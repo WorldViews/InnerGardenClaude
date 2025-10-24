@@ -359,6 +359,49 @@ class GardenStorage {
         const secondDate = new Date(date2);
         return Math.round(Math.abs((firstDate - secondDate) / oneDay));
     }
+
+    // Values Garden specific methods
+    getValuesGarden() {
+        return this.getSection('valuesGarden') || {
+            coreValues: [],
+            gardenAreas: {},
+            selectedValues: [],
+            currentStep: 1
+        };
+    }
+
+    saveValuesGarden(valuesData) {
+        return this.saveSection('valuesGarden', valuesData);
+    }
+
+    getCoreValues() {
+        const valuesGarden = this.getValuesGarden();
+        return Object.keys(valuesGarden.gardenAreas || {});
+    }
+
+    getGardenArea(value) {
+        const valuesGarden = this.getValuesGarden();
+        return valuesGarden.gardenAreas[value] || null;
+    }
+
+    updateGardenArea(value, areaData) {
+        const valuesGarden = this.getValuesGarden();
+        if (!valuesGarden.gardenAreas) {
+            valuesGarden.gardenAreas = {};
+        }
+        valuesGarden.gardenAreas[value] = { ...valuesGarden.gardenAreas[value], ...areaData };
+        return this.saveValuesGarden(valuesGarden);
+    }
+
+    isValuesGardenComplete() {
+        const valuesGarden = this.getValuesGarden();
+        return valuesGarden._completion?.completed || false;
+    }
+
+    getValuesGardenCompletionDate() {
+        const valuesGarden = this.getValuesGarden();
+        return valuesGarden._completion?.timestamp || null;
+    }
 }
 
 // Make GardenStorage available globally

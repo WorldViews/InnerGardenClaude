@@ -131,6 +131,13 @@ class GardenApp {
                     window.WeedTrackerPage.init();
                 }
                 break;
+            case 'values-garden':
+                if (window.ValuesGardenPage) {
+                    window.ValuesGardenPage.init();
+                } else {
+                    this.renderPlaceholderPage(pageId);
+                }
+                break;
             case 'garden-visualization':
                 if (window.GardenVisualizationPage) {
                     window.GardenVisualizationPage.init();

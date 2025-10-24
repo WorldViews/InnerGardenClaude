@@ -33,6 +33,10 @@ const GardenVisualizationPage = {
                             <h4 style="color: #2c3e50; margin-bottom: 10px;"><i class="fas fa-brain"></i> Wisdom Flowers</h4>
                             <p style="color: #7f8c8d; font-size: 0.9rem;">Purple flowers from transformed negative thoughts. Size reflects your growth.</p>
                         </div>
+                        <div class="flower-legend">
+                            <h4 style="color: #2c3e50; margin-bottom: 10px;"><i class="fas fa-compass"></i> Values Flowers</h4>
+                            <p style="color: #7f8c8d; font-size: 0.9rem;">Majestic flowers representing your core values. They bloom when you complete your Values Garden Design.</p>
+                        </div>
                     </div>
                     
                     <div class="garden-controls" style="text-align: center; margin-top: 15px;">
@@ -110,15 +114,22 @@ const GardenVisualizationPage = {
         const seedCount = flowers.filter(f => f.type === 'seed').length;
         const gratitudeCount = flowers.filter(f => f.type === 'gratitude').length;
         const wisdomCount = flowers.filter(f => f.type === 'wisdom').length;
+        const valuesCount = flowers.filter(f => f.type === 'values').length;
         const totalFlowers = flowers.length;
 
         const oldestFlower = flowers.reduce((oldest, flower) =>
             flower.age > oldest.age ? flower : oldest, { age: 0 });
 
-        document.getElementById('garden-flower-count').innerHTML = `
-            <strong>${totalFlowers} Flowers</strong><br>
-            ${seedCount} Seeds • ${gratitudeCount} Gratitude • ${wisdomCount} Wisdom
-        `;
+        let statsText = `<strong>${totalFlowers} Flowers</strong><br>`;
+        if (seedCount > 0) statsText += `${seedCount} Seeds • `;
+        if (gratitudeCount > 0) statsText += `${gratitudeCount} Gratitude • `;
+        if (wisdomCount > 0) statsText += `${wisdomCount} Wisdom • `;
+        if (valuesCount > 0) statsText += `${valuesCount} Values • `;
+
+        // Remove trailing • 
+        statsText = statsText.replace(/ • $/, '');
+
+        document.getElementById('garden-flower-count').innerHTML = statsText;
 
         document.getElementById('garden-age-info').innerHTML = `
             Oldest: ${oldestFlower.age} days

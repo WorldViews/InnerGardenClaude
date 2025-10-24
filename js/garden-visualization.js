@@ -41,6 +41,7 @@ const GardenVisualization = {
 
         const dailyLogs = window.gardenStorage.getSection('dailyLogs') || {};
         const weedTracker = window.gardenStorage.getSection('weedTracker') || {};
+        const valuesGarden = window.gardenStorage.getSection('valuesGarden') || {};
 
         this.flowers = [];
 
@@ -72,6 +73,20 @@ const GardenVisualization = {
             const wisdomFlower = this.createWisdomFlower(weed, daysOld, improvement, index);
             this.flowers.push(wisdomFlower);
         });
+
+        // Create values flowers if values garden is complete
+        if (valuesGarden._completion?.completed) {
+            const coreValues = Object.keys(valuesGarden.gardenAreas || {});
+            const completionDaysOld = this.getDaysSince(valuesGarden._completion.timestamp.split('T')[0]);
+
+            coreValues.forEach((value, index) => {
+                const area = valuesGarden.gardenAreas[value];
+                if (area) {
+                    const valuesFlower = this.createValuesFlower(value, area, completionDaysOld, index);
+                    this.flowers.push(valuesFlower);
+                }
+            });
+        }
 
         // Sort flowers by age for layered rendering
         this.flowers.sort((a, b) => b.age - a.age);
@@ -127,6 +142,72 @@ const GardenVisualization = {
             swayOffset: Math.random() * Math.PI * 2,
             originalY: 0
         };
+    },
+
+    createValuesFlower(value, area, age, index) {
+        const activitiesCount = (area.activities || []).length;
+        const intentionsCount = (area.intentions || []).length;
+        const strength = Math.min((activitiesCount + intentionsCount) / 10, 1);
+
+        return {
+            id: `values-${value}-${index}`,
+            type: 'values',
+            text: area.name || `${value} Garden`,
+            value: value,
+            date: area.createdDate || new Date().toISOString().split('T')[0],
+            age: age,
+            strength: strength,
+            x: this.getValuesFlowerPosition(value, index).x,
+            y: this.getValuesFlowerPosition(value, index).y,
+            growth: Math.min(age / 30 + strength, 1), // Slower growth, more majestic
+            color: this.getValuesColor(value),
+            size: Math.min(35 + strength * 25, 80), // Larger, more prominent flowers
+            swayOffset: Math.random() * Math.PI * 2,
+            originalY: 0,
+            icon: this.getValueIcon(value)
+        };
+    },
+
+    getValuesFlowerPosition(value, index) {
+        // Position values flowers in special areas of the garden
+        const sections = 5; // Divide garden into sections for core values
+        const sectionWidth = (this.canvas.width - 100) / sections;
+        const baseX = 50 + (index * sectionWidth) + (sectionWidth / 2);
+
+        // Add some variation but keep them spaced out
+        const variation = (Math.random() - 0.5) * (sectionWidth * 0.3);
+        const x = Math.max(50, Math.min(this.canvas.width - 50, baseX + variation));
+
+        const groundLevel = this.canvas.height - 50;
+        const y = groundLevel - 20 - (Math.random() * 30); // Near the back of the garden
+
+        return { x, y };
+    },
+
+    getValuesColor(value) {
+        // Create distinctive colors for values flowers
+        const colors = {
+            'Family': '#e74c3c', 'Love': '#e91e63', 'Friendship': '#9c27b0',
+            'Health': '#4caf50', 'Wellness': '#8bc34a', 'Balance': '#00bcd4',
+            'Learning': '#2196f3', 'Growth': '#03a9f4', 'Wisdom': '#673ab7',
+            'Creativity': '#ff9800', 'Art': '#ff5722', 'Innovation': '#ffc107',
+            'Service': '#795548', 'Community': '#607d8b', 'Purpose': '#3f51b5',
+            'Adventure': '#009688', 'Freedom': '#cddc39', 'Peace': '#c8e6c9'
+        };
+
+        return colors[value] || '#6c757d';
+    },
+
+    getValueIcon(value) {
+        const icons = {
+            'Family': '👨‍👩‍👧‍👦', 'Love': '💕', 'Friendship': '🤝', 'Community': '🏘️',
+            'Health': '🌿', 'Wellness': '💪', 'Balance': '⚖️', 'Peace': '☮️',
+            'Learning': '📚', 'Growth': '🌱', 'Wisdom': '🦉', 'Knowledge': '🧠',
+            'Creativity': '🎨', 'Art': '🖼️', 'Innovation': '💡', 'Purpose': '🎯',
+            'Adventure': '🗺️', 'Freedom': '🕊️', 'Service': '🤲', 'Joy': '😊'
+        };
+
+        return icons[value] || '🌸';
     },
 
     getFlowerPosition(seedText) {
@@ -302,6 +383,9 @@ const GardenVisualization = {
                 case 'wisdom':
                     this.drawWisdomFlower(x, y, flower);
                     break;
+                case 'values':
+                    this.drawValuesFlower(x, y, flower);
+                    break;
             }
         } else {
             // Draw bud
@@ -398,6 +482,60 @@ const GardenVisualization = {
         this.ctx.fillStyle = '#4B0082';
         this.ctx.beginPath();
         this.ctx.arc(x, y, Math.abs(baseSize * 0.3), 0, Math.PI * 2);
+        this.ctx.fill();
+    },
+
+    drawValuesFlower(x, y, flower) {
+        const baseSize = Math.max(0, flower.size * 0.25 * flower.growth);
+
+        // Draw outer glow for values flowers (more majestic)
+        const gradient = this.ctx.createRadialGradient(x, y, 0, x, y, baseSize * 2);
+        gradient.addColorStop(0, flower.color + '40');
+        gradient.addColorStop(1, flower.color + '00');
+        this.ctx.fillStyle = gradient;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, Math.abs(baseSize * 2), 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Draw value icon background
+        this.ctx.fillStyle = '#ffffff';
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, Math.abs(baseSize * 1.2), 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Draw multi-layer petals for richness
+        const layers = 4;
+        for (let layer = 0; layer < layers; layer++) {
+            const layerSize = Math.max(0, baseSize * (1.2 - layer * 0.15));
+            const petalCount = 8 + layer;
+            const opacity = 0.8 - layer * 0.15;
+
+            this.ctx.fillStyle = flower.color + Math.floor(opacity * 255).toString(16).padStart(2, '0');
+
+            for (let i = 0; i < petalCount; i++) {
+                const angle = (i / petalCount) * Math.PI * 2 + layer * 0.3;
+                const petalX = x + Math.cos(angle) * layerSize * (1.2 + layer * 0.1);
+                const petalY = y + Math.sin(angle) * layerSize * (1.2 + layer * 0.1);
+
+                this.ctx.beginPath();
+                this.ctx.ellipse(petalX, petalY, Math.abs(layerSize * 0.3), Math.abs(layerSize * 1.5), angle, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        }
+
+        // Draw value icon in center
+        if (flower.icon) {
+            this.ctx.fillStyle = flower.color;
+            this.ctx.font = `${Math.floor(baseSize * 0.8)}px Arial`;
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText(flower.icon, x, y);
+        }
+
+        // Draw inner circle
+        this.ctx.fillStyle = flower.color;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, Math.abs(baseSize * 0.2), 0, Math.PI * 2);
         this.ctx.fill();
     },
 
