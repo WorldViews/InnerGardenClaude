@@ -490,10 +490,10 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
         // Extract activities from daily log
         if (dailyLog && dailyLog.activities) {
             const completedActivities = Object.entries(dailyLog.activities)
-                .filter(([, data]) => data.completed)
+                .filter(([, data]) => data && data.completed)
                 .map(([activity, data]) => ({
                     name: activity,
-                    duration: data.duration,
+                    duration: data.duration || 0,
                     timestamp: dailyLog.timestamp
                 }));
             if (completedActivities.length > 0) {
@@ -921,7 +921,7 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
             // Activities
             if (dailyLog && dailyLog.activities) {
                 const completedActivities = Object.entries(dailyLog.activities)
-                    .filter(([, data]) => data.completed);
+                    .filter(([, data]) => data && data.completed);
 
                 if (completedActivities.length > 0) {
                     html += `<div class="type-section">
