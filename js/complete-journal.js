@@ -488,9 +488,10 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
         }
 
         // Extract activities from daily log
+        // Show activities where either completed checkbox is checked OR minutes are entered
         if (dailyLog && dailyLog.activities) {
             const completedActivities = Object.entries(dailyLog.activities)
-                .filter(([, data]) => data && data.completed)
+                .filter(([, data]) => data && (data.completed || (data.duration && data.duration > 0)))
                 .map(([activity, data]) => ({
                     name: activity,
                     duration: data.duration || 0,
@@ -919,9 +920,10 @@ ${weed.actionPlan ? `Action Plan: ${weed.actionPlan}` : ''}`;
             }
 
             // Activities
+            // Show activities where either completed checkbox is checked OR minutes are entered
             if (dailyLog && dailyLog.activities) {
                 const completedActivities = Object.entries(dailyLog.activities)
-                    .filter(([, data]) => data && data.completed);
+                    .filter(([, data]) => data && (data.completed || (data.duration && data.duration > 0)));
 
                 if (completedActivities.length > 0) {
                     html += `<div class="type-section">
