@@ -402,6 +402,29 @@ class GardenStorage {
         const valuesGarden = this.getValuesGarden();
         return valuesGarden._completion?.timestamp || null;
     }
+
+    // Harvest Journal specific methods
+    harvestGoal(harvestEntry) {
+        const data = this.getData();
+        if (!data.harvestJournal) {
+            data.harvestJournal = {};
+        }
+        data.harvestJournal[harvestEntry.harvestId] = harvestEntry;
+        return this.saveData(data);
+    }
+
+    removeHarvest(harvestId) {
+        const data = this.getData();
+        if (!data.harvestJournal || !data.harvestJournal[harvestId]) {
+            return false;
+        }
+        delete data.harvestJournal[harvestId];
+        return this.saveData(data);
+    }
+
+    getHarvestJournal() {
+        return this.getSection('harvestJournal') || {};
+    }
 }
 
 // Make GardenStorage available globally

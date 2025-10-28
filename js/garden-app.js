@@ -138,6 +138,13 @@ class GardenApp {
                     this.renderPlaceholderPage(pageId);
                 }
                 break;
+            case 'harvest-journal':
+                if (window.HarvestJournalPage) {
+                    window.HarvestJournalPage.init();
+                } else {
+                    this.renderPlaceholderPage(pageId);
+                }
+                break;
             case 'garden-visualization':
                 if (window.GardenVisualizationPage) {
                     window.GardenVisualizationPage.init();
