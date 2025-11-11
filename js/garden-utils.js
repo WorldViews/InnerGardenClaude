@@ -282,7 +282,7 @@ window.importGardenData = function (event) {
 window.importFromURL = function () {
     const defaultURL = 'https://worldviews.org/InnerGarden/backups/inner-garden-backup.json';
     const url = prompt('Enter the URL of the JSON backup file to import:', defaultURL);
-    
+
     if (!url || url.trim() === '') {
         return; // User cancelled
     }
