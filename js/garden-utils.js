@@ -279,6 +279,64 @@ window.importGardenData = function (event) {
     event.target.value = '';
 };
 
+window.importFromURL = function () {
+    const defaultURL = 'https://worldviews.org/InnerGarden/backups/inner-garden-backup.json';
+    const url = prompt('Enter the URL of the JSON backup file to import:', defaultURL);
+    
+    if (!url || url.trim() === '') {
+        return; // User cancelled
+    }
+
+    // Show loading notification
+    window.showNotification('⏳ Downloading garden data from URL...', 'info');
+
+    // Fetch the data from the URL
+    fetch(url.trim())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(importedData => {
+            // Validate the imported data structure
+            if (!importedData.profile || !importedData.dailyLogs) {
+                window.showNotification('❌ Invalid garden data format from URL.', 'error');
+                return;
+            }
+
+            // Confirm import with user
+            const confirmImport = confirm(
+                'This will replace all your current garden data. Are you sure you want to import this backup?\n\n' +
+                'Tip: Export your current data first as a backup if needed.'
+            );
+
+            if (!confirmImport) {
+                window.showNotification('Import cancelled.', 'info');
+                return;
+            }
+
+            // Remove export metadata before importing
+            const { exportInfo, ...cleanData } = importedData;
+
+            // Save the imported data
+            if (window.gardenStorage.saveData(cleanData)) {
+                window.showNotification('🌱 Garden data imported successfully! Refreshing page...');
+
+                // Refresh the page to reflect imported data
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500);
+            } else {
+                window.showNotification('❌ Error importing garden data.', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error importing from URL:', error);
+            window.showNotification(`❌ Failed to import from URL: ${error.message}`, 'error');
+        });
+};
+
 // Update data statistics in the management panel
 window.updateDataStatistics = function () {
     const statsContainer = document.getElementById('data-stats');
