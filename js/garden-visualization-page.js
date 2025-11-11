@@ -4,7 +4,22 @@ const GardenVisualizationPage = {
 
     init() {
         this.render();
+        this.setupEventListeners();
         this.startVisualization();
+    },
+
+    setupEventListeners() {
+        // Refresh garden button
+        const refreshBtn = document.getElementById('refresh-garden-btn');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.refreshGarden());
+        }
+
+        // Download garden image button
+        const downloadBtn = document.getElementById('download-garden-btn');
+        if (downloadBtn) {
+            downloadBtn.addEventListener('click', () => this.downloadGardenImage());
+        }
     },
 
     render() {
@@ -40,11 +55,11 @@ const GardenVisualizationPage = {
                     </div>
                     
                     <div class="garden-controls" style="text-align: center; margin-top: 15px;">
-                        <button onclick="GardenVisualizationPage.refreshGarden()" 
+                        <button id="refresh-garden-btn"
                                 style="background: #27ae60; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer; margin-right: 10px;">
                             <i class="fas fa-sync"></i> Refresh Garden
                         </button>
-                        <button onclick="GardenVisualizationPage.downloadGardenImage()" 
+                        <button id="download-garden-btn"
                                 style="background: #3498db; color: white; border: none; padding: 10px 20px; border-radius: 8px; cursor: pointer;">
                             <i class="fas fa-camera"></i> Save Garden Photo
                         </button>
