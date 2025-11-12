@@ -1,0 +1,21 @@
+
+client id:
+141603479965-u4eap36jnsouqttrr9ah8ermmms9tmm3.apps.googleusercontent.com
+
+client secret:
+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
+
+downloaded JSON:
+{"web":
+  {"client_id":"141603479965-u4eap36jnsouqttrr9ah8ermmms9tmm3.apps.googleusercontent.com",
+  "project_id":"inner-garden-tracker-1",
+  "auth_uri":"https://accounts.google.com/o/oauth2/auth",
+  "token_uri":"https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs",
+  "client_secret":"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",
+  "redirect_uris":[
+    "https://worldviews.org",
+    "http://localhost"],
+  "javascript_origins":[
+    "https://worldviews.org",
+    "http://localhost"]}}

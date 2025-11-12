@@ -17,7 +17,9 @@ A beautiful, metaphor-rich personal development web application that helps you c
 
 ### 📊 **Data Management**
 - **Local Storage**: All data stored securely in your browser
-- **Export/Import**: JSON backup and restore functionality
+- **Google Drive Sync**: Optional cloud backup and sync across devices
+- **Export/Import**: JSON and YAML backup and restore functionality
+- **Import from URL**: Load backups from remote URLs
 - **Multiple Export Formats**: HTML journal exports
 - **Data Validation**: Robust error handling and data integrity checks
 
@@ -141,6 +143,27 @@ Comprehensive view of your journey:
 - **Export Options**: HTML format
 - **Statistics**: Word counts, entry analysis, growth metrics
 - **Search & Sort**: Find specific entries quickly
+
+### ☁️ **Google Drive Sync** (New!)
+Optionally sync your garden data to Google Drive:
+- **Save to Google Drive**: Backup your data to your personal Google Drive
+- **Load from Google Drive**: Restore data from your Drive backup
+- **Privacy First**: Only accesses files created by the app (not your entire Drive)
+- **One-Click Auth**: Simple Google login popup for authentication
+- **No Account Required**: Works without Google Drive if you prefer local-only storage
+
+**How to Use:**
+1. Click "Save to Google Drive" in the Data Management section
+2. Sign in with your Google account (one-time per session)
+3. Grant permission for the app to store files in your Drive
+4. Your data is automatically saved as `inner-garden-data.json`
+5. Use "Load from Google Drive" to restore from any device
+
+**Privacy & Security:**
+- App only accesses its own files (using `drive.file` scope)
+- No server-side storage - direct browser-to-Google connection
+- You can revoke access anytime via Google account settings
+- Authentication tokens are never stored in localStorage
 
 ## 🔧 Developer Guide
 
