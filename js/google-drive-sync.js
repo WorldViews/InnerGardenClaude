@@ -1011,12 +1011,118 @@ class GoogleDriveSync {
     }
 
     async manualSync() {
-        if (!this.autoSyncEnabled) {
-            // Not auto-syncing, just do a one-time save
-            await this.saveToGoogleDrive();
+        try {
+            this.updateSyncStatus('info', 'Checking for changes...', 'fa-sync fa-spin');
+
+            // Check if we have a file on Drive
+            const files = await this.listFiles();
+            
+            if (files.length === 0) {
+                // No file on Drive, upload local data
+                this.updateSyncStatus('info', 'No Drive data found - uploading...', 'fa-upload');
+                await this.saveToGoogleDrive();
+                return;
+            }
+
+            const driveFile = files[0];
+            const driveModifiedTime = new Date(driveFile.modifiedTime);
+            const lastSyncTime = this.getLastSyncTime();
+
+            // Download Drive data to compare
+            const driveData = await this.downloadFile(driveFile.id);
+            
+            if (!driveData) {
+                this.updateSyncStatus('error', 'Failed to read Drive data', 'fa-exclamation-triangle');
+                return;
+            }
+
+            const localData = this.getDataToSync();
+            
+            // Calculate hashes to detect if data is different
+            const driveHash = this.simpleHash(JSON.stringify({
+                profile: driveData.profile,
+                dailyLogs: driveData.dailyLogs,
+                weedTracker: driveData.weedTracker,
+                harvestJournal: driveData.harvestJournal
+            }));
+            
+            const localHash = this.simpleHash(JSON.stringify({
+                profile: localData.profile,
+                dailyLogs: localData.dailyLogs,
+                weedTracker: localData.weedTracker,
+                harvestJournal: localData.harvestJournal
+            }));
+
+            // If data is identical, nothing to do
+            if (driveHash === localHash) {
+                this.updateSyncStatus('success', 'Already in sync - no changes needed', 'fa-check');
+                return;
+            }
+
+            // Data is different - determine direction
+            if (!lastSyncTime) {
+                // Never synced before - we have a conflict
+                const userChoice = confirm(
+                    'Both local and Drive data exist but have never been synced.\n\n' +
+                    'Click OK to use Drive data (download)\n' +
+                    'Click Cancel to use local data (upload)'
+                );
+                
+                if (userChoice) {
+                    // Download from Drive
+                    this.updateSyncStatus('info', 'Downloading from Drive...', 'fa-download');
+                    await this.loadFromDrive(driveData);
+                } else {
+                    // Upload to Drive
+                    this.updateSyncStatus('info', 'Uploading to Drive...', 'fa-upload');
+                    if (this.autoBackupEnabled) {
+                        await this.createBackup(driveFile.id);
+                    }
+                    await this.updateBackupFile(driveFile.id);
+                }
+            } else if (driveModifiedTime > lastSyncTime) {
+                // Drive is newer - download
+                this.updateSyncStatus('info', 'Drive has newer data - downloading...', 'fa-download');
+                await this.loadFromDrive(driveData);
+            } else {
+                // Local is newer - upload
+                this.updateSyncStatus('info', 'Local data is newer - uploading...', 'fa-upload');
+                if (this.autoBackupEnabled) {
+                    await this.createBackup(driveFile.id);
+                }
+                await this.updateBackupFile(driveFile.id);
+            }
+
+        } catch (error) {
+            console.error('Manual sync error:', error);
+            this.updateSyncStatus('error', 'Sync failed: ' + error.message, 'fa-exclamation-triangle');
+        }
+    }
+
+    async loadFromDrive(driveData) {
+        // Apply Drive data to local storage
+        const { exportInfo, ...cleanData } = driveData;
+        
+        if (window.gardenStorage.saveData(cleanData)) {
+            // Update last sync time
+            localStorage.setItem('lastSyncTime', new Date().toISOString());
+            
+            // Update cached hash
+            this.lastSyncedDataHash = this.simpleHash(JSON.stringify({
+                profile: cleanData.profile,
+                dailyLogs: cleanData.dailyLogs,
+                weedTracker: cleanData.weedTracker,
+                harvestJournal: cleanData.harvestJournal
+            }));
+            
+            this.updateSyncStatus('success', 'Downloaded from Drive successfully', 'fa-check');
+            
+            // Refresh the page to reflect downloaded data
+            setTimeout(() => {
+                location.reload();
+            }, 1000);
         } else {
-            // Force an immediate sync
-            await this.performAutoSync();
+            throw new Error('Failed to save Drive data locally');
         }
     }
 
