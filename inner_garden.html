@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inner Garden Tracker 🌱</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="css/garden-styles.css" rel="stylesheet">
+    <link href="css/garden-styles.css?v=2" rel="stylesheet">
 
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -71,12 +71,6 @@
                 <i class="fas fa-bug"></i>
                 <h3>Weed & Wisdom Tracker</h3>
                 <p>Identify and transform unhelpful thought patterns using CBT techniques. Turn weeds into compost.</p>
-            </div>
-
-            <div class="nav-card seasonal-planner" onclick="showPage('seasonal-planner')">
-                <i class="fas fa-calendar-alt"></i>
-                <h3>Seasonal Growth Planner</h3>
-                <p>Plan your growth cycles, set intentions for each season, and design your ideal garden layout.</p>
             </div>
 
             <div class="nav-card values-garden" onclick="showPage('values-garden')">
@@ -235,71 +229,34 @@
                 </div>
             </div>
 
-            <!-- Google Drive Auto-Sync Settings -->
+            <!-- Google Drive Sync Settings -->
             <div
                 style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-top: 25px;">
                 <h3 style="color: #4285f4; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
-                    <i class="fab fa-google-drive"></i> Google Drive Auto-Sync
+                    <i class="fab fa-google-drive"></i> Google Drive Sync
                 </h3>
                 <div style="display: flex; flex-direction: column; gap: 15px;">
-                    <!-- Auto-Sync Toggle -->
+                    <!-- Sync Button -->
                     <div
                         style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
-                            <input type="checkbox" id="auto-sync-checkbox"
-                                onchange="window.googleDriveSync.toggleAutoSync(this.checked)"
-                                style="width: 20px; height: 20px; cursor: pointer;">
-                            <span style="font-weight: 500; color: #2c3e50;">
-                                Enable Auto-Sync
-                            </span>
-                        </label>
-                        <button id="sync-now-btn" onclick="window.googleDriveSync.manualSync()"
-                            style="background: #4285f4; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s ease;"
+                        <button id="sync-now-btn" onclick="window.googleDriveSync.sync()"
+                            style="background: #4285f4; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 500; transition: all 0.3s ease; flex: 1;"
                             onmouseover="this.style.background='#3367d6'" onmouseout="this.style.background='#4285f4'">
                             <i class="fas fa-sync-alt"></i> Sync Now
                         </button>
                     </div>
 
-                    <!-- Auto-Backup Toggle -->
+                    <!-- Sync Description -->
                     <div
-                        style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
-                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
-                            <input type="checkbox" id="auto-backup-checkbox"
-                                onchange="window.googleDriveSync.toggleAutoBackup(this.checked)"
-                                style="width: 20px; height: 20px; cursor: pointer;" checked>
-                            <span style="font-weight: 500; color: #2c3e50;">
-                                Create backup before sync
-                                <span id="backup-count"
-                                    style="color: #7f8c8d; font-weight: normal; font-size: 0.9em; margin-left: 8px;">
-                                    No backups yet
-                                </span>
-                            </span>
-                        </label>
-                        <button id="clear-backups-btn" onclick="window.googleDriveSync.clearAllBackups()"
-                            style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s ease;"
-                            onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='#e74c3c'">
-                            <i class="fas fa-trash"></i> Clear Backups
-                        </button>
-                    </div>
-
-                    <!-- Sync Status Indicator -->
-                    <div id="sync-status"
-                        style="padding: 12px; border-radius: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; background: #e8f5e9; color: #27ae60;">
-                        <i class="fas fa-check-circle"></i>
-                        <span>Not connected - Click "Sync Now" or enable auto-sync to connect</span>
-                    </div>
-
-                    <!-- Auto-Sync Description -->
-                    <div
-                        style="padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 5px; font-size: 0.9rem; color: #856404; line-height: 1.6;">
-                        <strong><i class="fas fa-info-circle"></i> How Auto-Sync Works:</strong>
+                        style="padding: 15px; background: #e3f2fd; border-left: 4px solid #2196f3; border-radius: 5px; font-size: 0.9rem; color: #1565c0; line-height: 1.6;">
+                        <strong><i class="fas fa-info-circle"></i> How Sync Works:</strong>
                         <ul style="margin: 10px 0 0 20px; padding: 0;">
-                            <li>Automatically saves changes to Google Drive every 5 minutes</li>
-                            <li>Backups created before each update (keeps 20 most recent)</li>
-                            <li>Checks for conflicts before syncing</li>
-                            <li>Works offline - syncs when connection restored</li>
-                            <li><strong>⚠️ Multi-Device Warning:</strong> Use on one device at a time to avoid data
-                                conflicts</li>
+                            <li>Compares local and Drive data to find the newest version</li>
+                            <li>Downloads if Drive is newer, uploads if local is newer</li>
+                            <li>Asks you to choose if both have never been synced</li>
+                            <li>Skips sync if data is already identical</li>
+                            <li><strong>💡 Tip:</strong> Click "Sync Now" before and after making changes on different
+                                devices</li>
                         </ul>
                     </div>
                 </div>
@@ -308,11 +265,11 @@
     </div>
 
     <div class="quick-actions">
-        <button class="quick-btn quick-log" onclick="quickLog()" title="Quick Log Entry">
-            <i class="fas fa-plus"></i>
+        <button class="quick-btn quick-home" onclick="goHome()" title="Home">
+            <i class="fas fa-home"></i>
         </button>
-        <button class="quick-btn quick-reflect" onclick="quickReflect()" title="Quick Reflection">
-            <i class="fas fa-lightbulb"></i>
+        <button class="quick-btn quick-log" onclick="quickLog()" title="Log Entry">
+            <i class="fas fa-plus"></i>
         </button>
         <button class="quick-btn quick-garden" onclick="showPage('garden-visualization')" title="View Garden">
             <i class="fas fa-seedling"></i>
@@ -329,7 +286,6 @@
     <!-- Page Content Containers (Initially Hidden) -->
     <div id="daily-log-page" class="current-page"></div>
     <div id="weed-tracker-page" class="current-page"></div>
-    <div id="seasonal-planner-page" class="current-page"></div>
     <div id="values-garden-page" class="current-page"></div>
     <div id="harvest-journal-page" class="current-page"></div>
     <div id="garden-visualization-page" class="current-page"></div>

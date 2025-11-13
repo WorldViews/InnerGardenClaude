@@ -146,45 +146,30 @@ Comprehensive view of your journey:
 
 ### ☁️ **Google Drive Sync**
 Optionally sync your garden data to Google Drive:
-- **Manual Sync**: One-click save/load to Google Drive
-- **Auto-Sync**: Automatically sync changes every 5 minutes
-- **Auto-Backup**: Creates timestamped backups before each sync (keeps 20 most recent)
-- **Conflict Detection**: Warns before overwriting newer data
-- **Offline Support**: Queues syncs when offline, resumes when back online
+- **Smart Sync**: Compares timestamps to determine sync direction
+- **Bidirectional**: Downloads if Drive is newer, uploads if local is newer
+- **Conflict Handling**: Asks you to choose when sync history is unclear
+- **Change Detection**: Skips sync if data is already identical
 - **Privacy First**: Only accesses files created by the app (not your entire Drive)
-- **Organized Storage**: Main file and backups in dedicated "InnerGarden" folder
+- **Organized Storage**: Stores data in dedicated "InnerGarden" folder
 
-**How to Use Manual Sync:**
-1. Click "Save to Google Drive" in the Data Management section
+**How to Use Sync:**
+1. Click "Sync Now" in the Data Management section
 2. Sign in with your Google account (one-time per session)
 3. Grant permission for the app to store files in your Drive
-4. Your data is saved as `InnerGarden/inner-garden-data.json`
-5. Use "Load from Google Drive" to restore from any device
+4. Sync compares local and Drive data:
+   - If no Drive file exists → uploads local data
+   - If Drive is newer → downloads and applies Drive data
+   - If local is newer → uploads local data
+   - If data is identical → skips sync
+   - If never synced → asks you to choose direction
+5. Your data is saved as `InnerGarden/inner-garden-data.json`
 
-**How to Use Auto-Sync:**
-1. Enable "Auto-Sync" checkbox in Data Management section
-2. Authenticate with Google Drive (one-time)
-3. Changes are automatically synced every 5 minutes
-4. Status indicator shows sync state (syncing, synced, offline, errors)
-5. Conflict detection prevents accidental data loss
-
-**Auto-Backup Feature:**
-- ✅ Enabled by default for safety
-- ✅ Creates backup before overwriting main file
-- ✅ Timestamped filenames (e.g., `inner-garden-backup-2025-11-13-14-30-45.json`)
-- ✅ Stored in `InnerGarden/backups/` folder
-- ✅ Automatically keeps only 20 most recent backups
-- ✅ "Clear Backups" button to delete all backups
-- ✅ Backups viewable/downloadable directly from Google Drive
-
-**Features:**
-- ✅ Debounced sync (waits 30 seconds after last change)
-- ✅ Automatic conflict detection with user prompt
-- ✅ Retry logic with exponential backoff
-- ✅ Online/offline detection
-- ✅ Visual sync status indicator
-- ✅ Safety net: recover from accidental overwrites
-- ⚠️ **Multi-Device Warning**: Use on one device at a time, or conflicts may occur
+**Multi-Device Usage:**
+- Click "Sync Now" before starting work on any device
+- Click "Sync Now" after making changes
+- Each sync updates a timestamp to track which version is newest
+- Always sync before switching devices to avoid conflicts
 
 **Privacy & Security:**
 - App only accesses its own files (using `drive.file` scope)

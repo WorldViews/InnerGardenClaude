@@ -170,14 +170,12 @@ class GardenApp {
 
     renderPlaceholderPage(pageId) {
         const pageNames = {
-            'seasonal-planner': 'Seasonal Growth Planner',
             'values-garden': 'Values Garden Design',
             'harvest-journal': 'Harvest & Celebration',
             'garden-insights': 'Garden Insights'
         };
 
         const icons = {
-            'seasonal-planner': 'calendar-alt',
             'values-garden': 'compass',
             'harvest-journal': 'trophy',
             'garden-insights': 'chart-pie'

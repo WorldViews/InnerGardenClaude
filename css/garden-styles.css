@@ -232,6 +232,10 @@ body {
     transform: scale(1.1);
 }
 
+.quick-home {
+    background: #2c3e50;
+}
+
 .quick-log {
     background: #e74c3c;
 }
@@ -253,7 +257,7 @@ body {
 }
 
 .quick-journal {
-    background: #8e44ad;
+    background: #a569bd;
 }
 
 /* ===============================

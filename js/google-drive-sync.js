@@ -1,43 +1,18 @@
-// Google Drive Sync functionality for Inner Garden Tracker
+// Google Drive Sync - Clean Implementation
+// Simplified, reliable sync with no auto-sync complexity
 
 const GOOGLE_CLIENT_ID = '141603479965-u4eap36jnsouqttrr9ah8ermmms9tmm3.apps.googleusercontent.com';
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE_FILE_NAME = 'inner-garden-data.json';
 const DRIVE_FOLDER_NAME = 'InnerGarden';
-const BACKUP_FOLDER_NAME = 'backups';
-const MAX_BACKUPS = 20;
-const AUTO_SYNC_INTERVAL = 5 * 60 * 1000; // 5 minutes
-const SYNC_DEBOUNCE_DELAY = 30 * 1000; // 30 seconds after last change
 
 class GoogleDriveSync {
     constructor() {
         this.accessToken = null;
         this.tokenClient = null;
-        this.driveFileId = null; // ID of the backup file in Drive
-        this.driveFolderId = null; // ID of the InnerGarden folder
-        this.backupFolderId = null; // ID of the backups folder
+        this.driveFolderId = null;
+        this.driveFileId = null;
         this.isInitialized = false;
-
-        // Auto-sync state
-        this.autoSyncEnabled = false;
-        this.autoBackupEnabled = true; // Default: enabled
-        this.autoSyncTimer = null;
-        this.syncDebounceTimer = null;
-        this.lastSyncTime = null;
-        this.lastSyncedDataHash = null; // Track last synced data to avoid redundant syncs
-        this.isSyncing = false;
-        this.isOnline = navigator.onLine;
-        this.syncRetryCount = 0;
-        this.maxRetries = 3;
-        this.backupCount = 0;
-
-        // Load preferences
-        this.loadAutoSyncPreference();
-        this.loadAutoBackupPreference();
-
-        // Listen for online/offline events
-        window.addEventListener('online', () => this.handleOnline());
-        window.addEventListener('offline', () => this.handleOffline());
     }
 
     // Initialize Google Identity Services
@@ -65,7 +40,7 @@ class GoogleDriveSync {
         }
     }
 
-    // Request access token (triggers Google OAuth popup)
+    // Request access token (triggers OAuth popup)
     async requestAccessToken() {
         return new Promise((resolve, reject) => {
             if (!this.tokenClient) {
@@ -73,23 +48,17 @@ class GoogleDriveSync {
                 return;
             }
 
-            // Override callback for this specific request
             const originalCallback = this.tokenClient.callback;
             this.tokenClient.callback = (response) => {
-                // Restore original callback
                 this.tokenClient.callback = originalCallback;
 
                 if (response.error) {
-                    console.error('OAuth error details:', response);
                     let errorMessage = response.error;
-
-                    // Provide helpful error messages
                     if (response.error === 'access_denied') {
-                        errorMessage = 'Access denied. Please add your email as a test user in Google Cloud Console (APIs & Services → OAuth consent screen → Test users)';
+                        errorMessage = 'Access denied. Please add your email as a test user in Google Cloud Console';
                     } else if (response.error === 'popup_closed_by_user') {
                         errorMessage = 'Login popup was closed. Please try again.';
                     }
-
                     reject(new Error(errorMessage));
                     return;
                 }
@@ -98,24 +67,21 @@ class GoogleDriveSync {
                 resolve(this.accessToken);
             };
 
-            // Trigger OAuth popup
             this.tokenClient.requestAccessToken({ prompt: '' });
         });
     }
 
-    // Find or create the InnerGarden folder
+    // Ensure the InnerGarden folder exists
     async ensureFolder() {
         if (!this.accessToken) {
             throw new Error('Not authenticated');
         }
 
-        // Check if folder already exists
+        // Check if folder exists
         const searchResponse = await fetch(
             `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
             {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
-                }
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
             }
         );
 
@@ -124,15 +90,12 @@ class GoogleDriveSync {
         }
 
         const searchData = await searchResponse.json();
-
         if (searchData.files && searchData.files.length > 0) {
-            // Folder exists
             this.driveFolderId = searchData.files[0].id;
-            console.log('Found existing InnerGarden folder:', this.driveFolderId);
             return this.driveFolderId;
         }
 
-        // Create new folder
+        // Create folder
         const createResponse = await fetch(
             'https://www.googleapis.com/drive/v3/files',
             {
@@ -155,279 +118,21 @@ class GoogleDriveSync {
 
         const folderData = await createResponse.json();
         this.driveFolderId = folderData.id;
-        console.log('Created InnerGarden folder:', this.driveFolderId);
         return this.driveFolderId;
     }
 
-    // Find or create the backups subfolder
-    async ensureBackupFolder() {
+    // Find the data file in Drive
+    async findDataFile() {
         if (!this.accessToken) {
             throw new Error('Not authenticated');
         }
 
-        // Ensure main folder exists first
-        await this.ensureFolder();
-
-        // Check if backups folder already exists
-        const searchResponse = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=name='${BACKUP_FOLDER_NAME}' and '${this.driveFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
-                }
-            }
-        );
-
-        if (!searchResponse.ok) {
-            throw new Error(`Drive API error: ${searchResponse.status}`);
-        }
-
-        const searchData = await searchResponse.json();
-
-        if (searchData.files && searchData.files.length > 0) {
-            // Folder exists
-            this.backupFolderId = searchData.files[0].id;
-            console.log('Found existing backups folder:', this.backupFolderId);
-            return this.backupFolderId;
-        }
-
-        // Create new backups folder inside InnerGarden
-        const createResponse = await fetch(
-            'https://www.googleapis.com/drive/v3/files',
-            {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    name: BACKUP_FOLDER_NAME,
-                    mimeType: 'application/vnd.google-apps.folder',
-                    parents: [this.driveFolderId],
-                    description: 'Automated backups of Inner Garden data'
-                })
-            }
-        );
-
-        if (!createResponse.ok) {
-            throw new Error(`Failed to create backups folder: ${createResponse.status}`);
-        }
-
-        const folderData = await createResponse.json();
-        this.backupFolderId = folderData.id;
-        console.log('Created backups folder:', this.backupFolderId);
-        return this.backupFolderId;
-    }
-
-    // Create a timestamped backup of the current file
-    async createBackup() {
-        if (!this.accessToken || !this.autoBackupEnabled) {
-            return; // Skip if not enabled
-        }
-
-        try {
-            // Ensure backup folder exists
-            await this.ensureBackupFolder();
-
-            // Get current file content
-            if (!this.driveFileId) {
-                await this.findBackupFile();
-            }
-
-            if (!this.driveFileId) {
-                console.log('No existing file to backup');
-                return;
-            }
-
-            // Download current file content
-            const downloadResponse = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${this.driveFileId}?alt=media`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (!downloadResponse.ok) {
-                throw new Error(`Failed to download file for backup: ${downloadResponse.status}`);
-            }
-
-            const fileContent = await downloadResponse.text();
-
-            // Create timestamp for filename
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '-').split('.')[0];
-            const backupFileName = `inner-garden-backup-${timestamp}.json`;
-
-            // Upload backup to backups folder
-            const metadata = {
-                name: backupFileName,
-                mimeType: 'application/json',
-                parents: [this.backupFolderId],
-                description: `Automatic backup created at ${new Date().toLocaleString()}`
-            };
-
-            const form = new FormData();
-            form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-            form.append('file', new Blob([fileContent], { type: 'application/json' }));
-
-            const uploadResponse = await fetch(
-                'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
-                {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    },
-                    body: form
-                }
-            );
-
-            if (!uploadResponse.ok) {
-                throw new Error(`Failed to create backup: ${uploadResponse.status}`);
-            }
-
-            console.log(`Backup created: ${backupFileName}`);
-
-            // Clean up old backups
-            await this.deleteOldBackups();
-
-        } catch (error) {
-            console.error('Error creating backup:', error);
-            // Don't throw - backup failure shouldn't stop the sync
-            window.showNotification('⚠️ Warning: Backup creation failed, but sync will continue', 'warning');
-        }
-    }
-
-    // Delete old backups, keeping only the most recent MAX_BACKUPS
-    async deleteOldBackups() {
-        if (!this.accessToken || !this.backupFolderId) {
-            return;
-        }
-
-        try {
-            // List all backup files
-            const listResponse = await fetch(
-                `https://www.googleapis.com/drive/v3/files?q='${this.backupFolderId}' in parents and trashed=false&orderBy=createdTime desc&fields=files(id,name,createdTime)`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (!listResponse.ok) {
-                throw new Error(`Failed to list backups: ${listResponse.status}`);
-            }
-
-            const listData = await listResponse.json();
-            const backups = listData.files || [];
-
-            this.backupCount = backups.length;
-            this.updateBackupCountDisplay();
-
-            // Delete oldest backups if we have more than MAX_BACKUPS
-            if (backups.length > MAX_BACKUPS) {
-                const toDelete = backups.slice(MAX_BACKUPS);
-                console.log(`Deleting ${toDelete.length} old backups`);
-
-                for (const backup of toDelete) {
-                    await fetch(
-                        `https://www.googleapis.com/drive/v3/files/${backup.id}`,
-                        {
-                            method: 'DELETE',
-                            headers: {
-                                'Authorization': `Bearer ${this.accessToken}`
-                            }
-                        }
-                    );
-                }
-
-                this.backupCount = MAX_BACKUPS;
-                this.updateBackupCountDisplay();
-            }
-        } catch (error) {
-            console.error('Error deleting old backups:', error);
-        }
-    }
-
-    // Clear all backups with user confirmation
-    async clearAllBackups() {
-        if (!confirm(`Are you sure you want to delete all ${this.backupCount} backups?\n\nThis cannot be undone!`)) {
-            return;
-        }
-
-        if (!this.accessToken) {
-            window.showNotification('❌ Not authenticated with Google Drive', 'error');
-            return;
-        }
-
-        try {
-            window.showNotification('🗑️ Deleting all backups...', 'info');
-
-            // Ensure backup folder exists
-            await this.ensureBackupFolder();
-
-            // List all backup files
-            const listResponse = await fetch(
-                `https://www.googleapis.com/drive/v3/files?q='${this.backupFolderId}' in parents and trashed=false&fields=files(id,name)`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (!listResponse.ok) {
-                throw new Error(`Failed to list backups: ${listResponse.status}`);
-            }
-
-            const listData = await listResponse.json();
-            const backups = listData.files || [];
-
-            if (backups.length === 0) {
-                window.showNotification('No backups to delete', 'info');
-                return;
-            }
-
-            // Delete all backups
-            for (const backup of backups) {
-                await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${backup.id}`,
-                    {
-                        method: 'DELETE',
-                        headers: {
-                            'Authorization': `Bearer ${this.accessToken}`
-                        }
-                    }
-                );
-            }
-
-            this.backupCount = 0;
-            this.updateBackupCountDisplay();
-
-            window.showNotification(`✅ Deleted ${backups.length} backups successfully!`, 'success');
-
-        } catch (error) {
-            console.error('Error clearing backups:', error);
-            window.showNotification('❌ Failed to clear backups: ' + error.message, 'error');
-        }
-    }
-
-    // Find existing backup file in InnerGarden folder
-    async findBackupFile() {
-        if (!this.accessToken) {
-            throw new Error('Not authenticated');
-        }
-
-        // Ensure folder exists first
         await this.ensureFolder();
 
         const response = await fetch(
             `https://www.googleapis.com/drive/v3/files?q=name='${DRIVE_FILE_NAME}' and '${this.driveFolderId}' in parents and trashed=false`,
             {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
-                }
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
             }
         );
 
@@ -436,7 +141,6 @@ class GoogleDriveSync {
         }
 
         const data = await response.json();
-
         if (data.files && data.files.length > 0) {
             this.driveFileId = data.files[0].id;
             return this.driveFileId;
@@ -445,191 +149,294 @@ class GoogleDriveSync {
         return null;
     }
 
-    // Create new backup file in InnerGarden folder
-    async createBackupFile(gardenData) {
-        if (!this.accessToken) {
-            throw new Error('Not authenticated');
+    // Download data from Drive
+    async downloadFromDrive(fileId) {
+        const response = await fetch(
+            `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+            {
+                headers: { 'Authorization': `Bearer ${this.accessToken}` }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to download: ${response.status}`);
         }
 
-        // Ensure folder exists
+        return await response.json();
+    }
+
+    // Upload data to Drive (create new file)
+    async uploadToDrive(data) {
         await this.ensureFolder();
 
         const metadata = {
             name: DRIVE_FILE_NAME,
             mimeType: 'application/json',
-            description: 'Inner Garden Tracker backup data',
-            parents: [this.driveFolderId]  // Put file in InnerGarden folder
+            parents: [this.driveFolderId]
         };
 
-        const fileContent = JSON.stringify(gardenData, null, 2);
-
-        const form = new FormData();
-        form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-        form.append('file', new Blob([fileContent], { type: 'application/json' }));
+        const formData = new FormData();
+        formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+        formData.append('file', new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
 
         const response = await fetch(
             'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
             {
                 method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
-                },
-                body: form
+                headers: { 'Authorization': `Bearer ${this.accessToken}` },
+                body: formData
             }
         );
 
         if (!response.ok) {
-            throw new Error(`Failed to create file: ${response.status}`);
+            throw new Error(`Upload failed: ${response.status}`);
         }
 
-        const data = await response.json();
-        this.driveFileId = data.id;
-        return data.id;
+        const result = await response.json();
+        this.driveFileId = result.id;
+        return result;
     }
 
-    // Update existing backup file in Drive
-    async updateBackupFile(gardenData) {
-        if (!this.accessToken || !this.driveFileId) {
-            throw new Error('Not authenticated or file not found');
-        }
-
-        // Create backup before updating (if enabled)
-        if (this.autoBackupEnabled) {
-            await this.createBackup();
-        }
-
-        const fileContent = JSON.stringify(gardenData, null, 2);
-
+    // Update existing file in Drive
+    async updateFileInDrive(fileId, data) {
         const response = await fetch(
-            `https://www.googleapis.com/upload/drive/v3/files/${this.driveFileId}?uploadType=media`,
+            `https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`,
             {
                 method: 'PATCH',
                 headers: {
                     'Authorization': `Bearer ${this.accessToken}`,
                     'Content-Type': 'application/json'
                 },
-                body: fileContent
+                body: JSON.stringify(data, null, 2)
             }
         );
 
         if (!response.ok) {
-            throw new Error(`Failed to update file: ${response.status}`);
+            throw new Error(`Update failed: ${response.status}`);
         }
 
         return await response.json();
     }
 
-    // Save current garden data to Google Drive
-    async saveToGoogleDrive() {
-        try {
-            window.showNotification('🔄 Connecting to Google Drive...', 'info');
+    // Add lastModified timestamp to data
+    addTimestamp(data) {
+        return {
+            ...data,
+            lastModified: new Date().toISOString()
+        };
+    }
 
-            // Request authentication
+    // Calculate hash of data (for detecting changes)
+    calculateHash(data) {
+        const content = JSON.stringify({
+            profile: data.profile,
+            dailyLogs: data.dailyLogs,
+            weedTracker: data.weedTracker,
+            harvestJournal: data.harvestJournal,
+            valuesGarden: data.valuesGarden
+        });
+
+        let hash = 0;
+        for (let i = 0; i < content.length; i++) {
+            const char = content.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        return hash.toString(36);
+    }
+
+    // Count entries in data (for conflict resolution)
+    countEntries(data) {
+        const dailyLogs = Object.keys(data.dailyLogs || {}).length;
+        const weeds = Object.keys(data.weedTracker || {}).length;
+        const harvests = Object.keys(data.harvestJournal || {}).length;
+
+        return {
+            dailyLogs,
+            weeds,
+            harvests,
+            total: dailyLogs + weeds + harvests
+        };
+    }
+
+    // Main sync method
+    async sync() {
+        try {
+            window.showNotification('🔄 Syncing with Google Drive...', 'info');
+
+            // Authenticate
             await this.requestAccessToken();
 
-            window.showNotification('📤 Uploading garden data...', 'info');
-
-            // Get current garden data
-            const gardenData = window.gardenStorage.getData();
-            if (!gardenData) {
-                window.showNotification('❌ No garden data to save', 'error');
+            // Get local data
+            const localData = window.gardenStorage.getData();
+            if (!localData) {
+                window.showNotification('❌ No local data found', 'error');
                 return;
             }
 
-            // Add export metadata
-            const stats = window.gardenStorage.calculateGrowthStats();
-            const exportData = {
-                ...gardenData,
-                exportInfo: {
-                    exportDate: new Date().toISOString(),
-                    version: '1.0',
-                    appName: 'Inner Garden Tracker',
-                    exportMethod: 'Google Drive Sync',
-                    summary: {
-                        totalDailyLogs: Object.keys(gardenData.dailyLogs || {}).length,
-                        totalWeedEntries: Object.keys(gardenData.weedTracker || {}).length,
-                        currentStreak: stats.streak,
-                        daysSinceStart: stats.daysSinceStart,
-                        wellnessScore: stats.wellnessScore
-                    }
+            // Check if file exists on Drive
+            const fileId = await this.findDataFile();
+
+            if (!fileId) {
+                // No Drive file - upload local data
+                console.log('No Drive file found - uploading local data');
+                const dataToUpload = this.addTimestamp(localData);
+                await this.uploadToDrive(dataToUpload);
+                window.showNotification('✅ Uploaded to Google Drive', 'success');
+                return;
+            }
+
+            // Download Drive data
+            const driveData = await this.downloadFromDrive(fileId);
+
+            // Get timestamps
+            const localTimestamp = localData.lastModified ? new Date(localData.lastModified) : null;
+            const driveTimestamp = driveData.lastModified ? new Date(driveData.lastModified) : null;
+
+            // Calculate hashes to detect if data actually differs
+            const localHash = this.calculateHash(localData);
+            const driveHash = this.calculateHash(driveData);
+
+            if (localHash === driveHash) {
+                // Data is identical
+                console.log('Data is identical - no sync needed');
+                window.showNotification('✅ Already in sync', 'success');
+                return;
+            }
+
+            // Data differs - determine direction
+            if (!localTimestamp && !driveTimestamp) {
+                // Neither has timestamp - ask user
+                const choice = confirm(
+                    'Both local and Drive data exist but have no sync history.\n\n' +
+                    'Click OK to download from Drive (overwrite local)\n' +
+                    'Click Cancel to upload to Drive (overwrite Drive)'
+                );
+
+                if (choice) {
+                    // Download from Drive
+                    await this.downloadAndApply(driveData);
+                } else {
+                    // Upload to Drive
+                    const dataToUpload = this.addTimestamp(localData);
+                    await this.updateFileInDrive(fileId, dataToUpload);
+                    window.showNotification('✅ Uploaded to Google Drive', 'success');
                 }
-            };
-
-            // Check if backup file exists
-            const existingFileId = await this.findBackupFile();
-
-            if (existingFileId) {
-                // Update existing file
-                await this.updateBackupFile(exportData);
-
-                // Update last sync time
-                localStorage.setItem('lastSyncTime', new Date().toISOString());
-
-                window.showNotification('✅ Garden data updated in Google Drive!', 'success');
+            } else if (!driveTimestamp || (localTimestamp && localTimestamp > driveTimestamp)) {
+                // Local is newer - upload
+                console.log('Local data is newer - uploading');
+                const dataToUpload = this.addTimestamp(localData);
+                await this.updateFileInDrive(fileId, dataToUpload);
+                window.showNotification('✅ Uploaded newer data to Drive', 'success');
+            } else if (!localTimestamp || driveTimestamp > localTimestamp) {
+                // Drive is newer - download
+                console.log('Drive data is newer - downloading');
+                await this.downloadAndApply(driveData);
             } else {
-                // Create new file
-                await this.createBackupFile(exportData);
+                // Timestamps equal but data differs - conflict
+                // Try to determine which has more data
+                const localCount = this.countEntries(localData);
+                const driveCount = this.countEntries(driveData);
 
-                // Update last sync time
-                localStorage.setItem('lastSyncTime', new Date().toISOString());
+                let message = 'Conflict detected: timestamps match but data differs.\n\n';
+                message += `Local: ${localCount.dailyLogs} daily logs, ${localCount.weeds} weeds, ${localCount.harvests} harvests\n`;
+                message += `Drive: ${driveCount.dailyLogs} daily logs, ${driveCount.weeds} weeds, ${driveCount.harvests} harvests\n\n`;
 
-                window.showNotification('✅ Garden data saved to Google Drive!', 'success');
+                if (localCount.total > driveCount.total) {
+                    message += '💡 Local has MORE data - recommend uploading (Cancel)\n\n';
+                } else if (driveCount.total > localCount.total) {
+                    message += '💡 Drive has MORE data - recommend downloading (OK)\n\n';
+                } else {
+                    message += '💡 Same amount of data but different content\n\n';
+                }
+
+                message += 'Click OK to download from Drive (overwrite local)\n';
+                message += 'Click Cancel to upload to Drive (overwrite Drive)';
+
+                const choice = confirm(message);
+
+                if (choice) {
+                    await this.downloadAndApply(driveData);
+                } else {
+                    const dataToUpload = this.addTimestamp(localData);
+                    await this.updateFileInDrive(fileId, dataToUpload);
+                    window.showNotification('✅ Uploaded to Google Drive', 'success');
+                }
             }
 
         } catch (error) {
-            console.error('Error saving to Google Drive:', error);
+            console.error('Sync error:', error);
             if (error.message.includes('popup')) {
                 window.showNotification('❌ Please allow popups to connect to Google Drive', 'error');
             } else {
-                window.showNotification('❌ Failed to save to Google Drive: ' + error.message, 'error');
+                window.showNotification('❌ Sync failed: ' + error.message, 'error');
             }
         }
     }
 
-    // Load garden data from Google Drive
+    // Download and apply Drive data to local storage
+    async downloadAndApply(driveData) {
+        // Remove any metadata before saving
+        const { exportInfo, ...cleanData } = driveData;
+
+        if (window.gardenStorage.saveData(cleanData)) {
+            window.showNotification('✅ Downloaded from Drive - Refreshing...', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            throw new Error('Failed to save downloaded data');
+        }
+    }
+
+    // Legacy method for "Save to Drive" button (simple upload)
+    async saveToGoogleDrive() {
+        try {
+            window.showNotification('🔄 Connecting to Google Drive...', 'info');
+            await this.requestAccessToken();
+
+            const localData = window.gardenStorage.getData();
+            if (!localData) {
+                window.showNotification('❌ No data to save', 'error');
+                return;
+            }
+
+            const dataToUpload = this.addTimestamp(localData);
+            const fileId = await this.findDataFile();
+
+            if (fileId) {
+                await this.updateFileInDrive(fileId, dataToUpload);
+                window.showNotification('✅ Updated in Google Drive', 'success');
+            } else {
+                await this.uploadToDrive(dataToUpload);
+                window.showNotification('✅ Saved to Google Drive', 'success');
+            }
+
+        } catch (error) {
+            console.error('Save error:', error);
+            window.showNotification('❌ Save failed: ' + error.message, 'error');
+        }
+    }
+
+    // Legacy method for "Load from Drive" button (simple download)
     async loadFromGoogleDrive() {
         try {
             window.showNotification('🔄 Connecting to Google Drive...', 'info');
-
-            // Request authentication
             await this.requestAccessToken();
 
-            window.showNotification('📥 Downloading garden data...', 'info');
-
-            // Find backup file
-            const fileId = await this.findBackupFile();
-
+            const fileId = await this.findDataFile();
             if (!fileId) {
-                window.showNotification('❌ No backup found in Google Drive. Save first!', 'warning');
+                window.showNotification('❌ No backup found in Google Drive', 'warning');
                 return;
             }
 
-            // Download file content
-            const response = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
+            const driveData = await this.downloadFromDrive(fileId);
 
-            if (!response.ok) {
-                throw new Error(`Failed to download file: ${response.status}`);
-            }
-
-            const importedData = await response.json();
-
-            // Validate the imported data structure
-            if (!importedData.profile || !importedData.dailyLogs) {
-                window.showNotification('❌ Invalid garden data format in Drive backup', 'error');
+            if (!driveData.profile || !driveData.dailyLogs) {
+                window.showNotification('❌ Invalid data format', 'error');
                 return;
             }
 
-            // Confirm import with user
             const confirmImport = confirm(
-                'This will replace all your current garden data with the backup from Google Drive. Are you sure?\n\n' +
-                'Tip: Export your current data first as a backup if needed.'
+                'This will replace all your current data with the Drive backup. Continue?'
             );
 
             if (!confirmImport) {
@@ -637,630 +444,12 @@ class GoogleDriveSync {
                 return;
             }
 
-            // Remove export metadata before importing
-            const { exportInfo, ...cleanData } = importedData;
-
-            // Save the imported data
-            if (window.gardenStorage.saveData(cleanData)) {
-                // Update last sync time
-                localStorage.setItem('lastSyncTime', new Date().toISOString());
-
-                window.showNotification('✅ Garden data loaded from Google Drive! Refreshing...', 'success');
-
-                // Refresh the page to reflect imported data
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            } else {
-                window.showNotification('❌ Error importing garden data', 'error');
-            }
+            await this.downloadAndApply(driveData);
 
         } catch (error) {
-            console.error('Error loading from Google Drive:', error);
-            if (error.message.includes('popup')) {
-                window.showNotification('❌ Please allow popups to connect to Google Drive', 'error');
-            } else {
-                window.showNotification('❌ Failed to load from Google Drive: ' + error.message, 'error');
-            }
+            console.error('Load error:', error);
+            window.showNotification('❌ Load failed: ' + error.message, 'error');
         }
-    }
-
-    // Check Drive connection status
-    async checkConnection() {
-        if (!this.accessToken) {
-            return { connected: false, message: 'Not connected to Google Drive' };
-        }
-
-        try {
-            const response = await fetch(
-                'https://www.googleapis.com/drive/v3/about?fields=user',
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (response.ok) {
-                const data = await response.json();
-                return {
-                    connected: true,
-                    user: data.user,
-                    message: `Connected as ${data.user.emailAddress}`
-                };
-            } else {
-                return { connected: false, message: 'Token expired' };
-            }
-        } catch (error) {
-            return { connected: false, message: 'Connection error' };
-        }
-    }
-
-    // ===== AUTO-SYNC FUNCTIONALITY =====
-
-    loadAutoSyncPreference() {
-        const enabled = localStorage.getItem('autoSyncEnabled') === 'true';
-        if (enabled) {
-            // Will be enabled after init
-            this.autoSyncEnabled = true;
-        }
-    }
-
-    saveAutoSyncPreference(enabled) {
-        localStorage.setItem('autoSyncEnabled', enabled.toString());
-    }
-
-    loadAutoBackupPreference() {
-        const stored = localStorage.getItem('autoBackupEnabled');
-        if (stored === null) {
-            this.autoBackupEnabled = true; // Default: enabled
-        } else {
-            this.autoBackupEnabled = stored === 'true';
-        }
-    }
-
-    saveAutoBackupPreference(enabled) {
-        localStorage.setItem('autoBackupEnabled', enabled.toString());
-    }
-
-    toggleAutoBackup(enabled) {
-        this.autoBackupEnabled = enabled;
-        this.saveAutoBackupPreference(enabled);
-
-        if (enabled) {
-            window.showNotification('✅ Auto-backup enabled - backups will be created before each sync', 'success');
-        } else {
-            window.showNotification('Auto-backup disabled', 'info');
-        }
-    }
-
-    updateBackupCountDisplay() {
-        const countElement = document.getElementById('backup-count');
-        if (countElement) {
-            if (this.backupCount > 0) {
-                countElement.textContent = `${this.backupCount} backup${this.backupCount !== 1 ? 's' : ''} stored`;
-                countElement.style.display = 'inline';
-            } else {
-                countElement.textContent = 'No backups yet';
-                countElement.style.display = 'inline';
-            }
-        }
-    }
-
-    toggleAutoSync(enabled) {
-        if (enabled) {
-            this.enableAutoSync();
-        } else {
-            this.disableAutoSync();
-        }
-    }
-
-    async enableAutoSync() {
-        this.autoSyncEnabled = true;
-        this.saveAutoSyncPreference(true);
-
-        // Update UI
-        const checkbox = document.getElementById('auto-sync-checkbox');
-        if (checkbox) checkbox.checked = true;
-
-        this.updateSyncStatus('info', 'Auto-sync enabled. Authenticating...', 'fa-spinner fa-spin');
-
-        try {
-            // Authenticate if not already
-            if (!this.accessToken) {
-                await this.requestAccessToken();
-            }
-
-            // Start the auto-sync timer
-            this.startAutoSyncTimer();
-
-            // Do an initial sync
-            await this.performAutoSync();
-
-            window.showNotification('✅ Auto-sync enabled! Your garden will sync every 5 minutes.', 'success');
-        } catch (error) {
-            console.error('Error enabling auto-sync:', error);
-            this.disableAutoSync();
-            window.showNotification('❌ Could not enable auto-sync: ' + error.message, 'error');
-        }
-    }
-
-    disableAutoSync() {
-        this.autoSyncEnabled = false;
-        this.saveAutoSyncPreference(false);
-
-        // Clear timers
-        if (this.autoSyncTimer) {
-            clearInterval(this.autoSyncTimer);
-            this.autoSyncTimer = null;
-        }
-        if (this.syncDebounceTimer) {
-            clearTimeout(this.syncDebounceTimer);
-            this.syncDebounceTimer = null;
-        }
-
-        // Update UI
-        const checkbox = document.getElementById('auto-sync-checkbox');
-        if (checkbox) checkbox.checked = false;
-
-        this.updateSyncStatus('secondary', 'Auto-sync disabled', 'fa-pause-circle');
-        window.showNotification('Auto-sync disabled', 'info');
-    }
-
-    startAutoSyncTimer() {
-        // Clear existing timer
-        if (this.autoSyncTimer) {
-            clearInterval(this.autoSyncTimer);
-        }
-
-        // Sync every 5 minutes
-        this.autoSyncTimer = setInterval(() => {
-            if (this.autoSyncEnabled && this.isOnline) {
-                this.performAutoSync();
-            }
-        }, AUTO_SYNC_INTERVAL);
-    }
-
-    // Called when data changes (debounced)
-    scheduleSync() {
-        if (!this.autoSyncEnabled || !this.isOnline) {
-            return;
-        }
-
-        // Clear existing debounce timer
-        if (this.syncDebounceTimer) {
-            clearTimeout(this.syncDebounceTimer);
-        }
-
-        // Schedule sync for 30 seconds from now
-        this.syncDebounceTimer = setTimeout(() => {
-            this.performAutoSync();
-        }, SYNC_DEBOUNCE_DELAY);
-    }
-
-    async performAutoSync() {
-        if (this.isSyncing || !this.autoSyncEnabled || !this.isOnline) {
-            return;
-        }
-
-        this.isSyncing = true;
-        this.updateSyncStatus('info', 'Checking for changes...', 'fa-spinner fa-spin');
-
-        try {
-            // Check if we have a valid token
-            if (!this.accessToken) {
-                throw new Error('Not authenticated');
-            }
-
-            // Get current garden data
-            const gardenData = window.gardenStorage.getData();
-            if (!gardenData) {
-                throw new Error('No data to sync');
-            }
-
-            // Calculate hash of current data (excluding timestamps that change)
-            const dataToHash = {
-                profile: gardenData.profile,
-                dailyLogs: gardenData.dailyLogs,
-                weedTracker: gardenData.weedTracker,
-                harvestJournal: gardenData.harvestJournal
-            };
-            const currentDataHash = this.simpleHash(JSON.stringify(dataToHash));
-
-            // Check if data has actually changed since last sync
-            if (this.lastSyncedDataHash === currentDataHash) {
-                console.log('No changes detected, skipping sync');
-                this.updateSyncStatus('success', 'Up to date (no changes)', 'fa-check-circle');
-                this.isSyncing = false;
-                return;
-            }
-
-            this.updateSyncStatus('info', 'Syncing...', 'fa-spinner fa-spin');
-
-            // Check for conflicts
-            const hasConflict = await this.checkForConflicts();
-            if (hasConflict) {
-                this.isSyncing = false;
-                return; // User was warned, sync aborted
-            }
-
-            // Add export metadata
-            const stats = window.gardenStorage.calculateGrowthStats();
-            const exportData = {
-                ...gardenData,
-                exportInfo: {
-                    exportDate: new Date().toISOString(),
-                    version: '1.0',
-                    appName: 'Inner Garden Tracker',
-                    exportMethod: 'Google Drive Auto-Sync',
-                    summary: {
-                        totalDailyLogs: Object.keys(gardenData.dailyLogs || {}).length,
-                        totalWeedEntries: Object.keys(gardenData.weedTracker || {}).length,
-                        currentStreak: stats.streak,
-                        daysSinceStart: stats.daysSinceStart,
-                        wellnessScore: stats.wellnessScore
-                    }
-                }
-            };
-
-            // Check if backup file exists
-            const existingFileId = await this.findBackupFile();
-
-            if (existingFileId) {
-                // Update existing file
-                await this.updateBackupFile(exportData);
-            } else {
-                // Create new file
-                await this.createBackupFile(exportData);
-            }
-
-            // Update hash after successful sync
-            this.lastSyncedDataHash = currentDataHash;
-            this.lastSyncTime = new Date();
-
-            // Save last sync time to localStorage
-            localStorage.setItem('lastSyncTime', this.lastSyncTime.toISOString());
-
-            this.syncRetryCount = 0;
-
-            const timeStr = this.lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-            this.updateSyncStatus('success', `Synced at ${timeStr}`, 'fa-check-circle');
-
-        } catch (error) {
-            console.error('Auto-sync error:', error);
-
-            // Handle token expiration
-            if (error.message.includes('401') || error.message.includes('Not authenticated')) {
-                this.updateSyncStatus('warning', 'Authentication expired - Please re-enable auto-sync', 'fa-exclamation-triangle');
-                this.disableAutoSync();
-                window.showNotification('⚠️ Auto-sync disabled - Please re-enable to re-authenticate', 'warning');
-            } else if (this.syncRetryCount < this.maxRetries) {
-                // Retry with exponential backoff
-                this.syncRetryCount++;
-                const retryDelay = Math.pow(2, this.syncRetryCount) * 1000;
-                this.updateSyncStatus('warning', `Sync failed, retrying in ${retryDelay / 1000}s...`, 'fa-exclamation-circle');
-
-                setTimeout(() => {
-                    this.performAutoSync();
-                }, retryDelay);
-            } else {
-                this.updateSyncStatus('error', 'Sync failed - Check connection', 'fa-times-circle');
-                this.syncRetryCount = 0;
-            }
-        } finally {
-            this.isSyncing = false;
-        }
-    }
-
-    // Simple hash function for detecting data changes
-    simpleHash(str) {
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
-        }
-        return hash.toString();
-    }
-
-    async checkForConflicts() {
-        try {
-            // Get file metadata including modified time
-            if (!this.driveFileId) {
-                await this.findBackupFile();
-            }
-
-            if (!this.driveFileId) {
-                return false; // No existing file, no conflict
-            }
-
-            const response = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${this.driveFileId}?fields=modifiedTime`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                return false; // Can't check, proceed with sync
-            }
-
-            const fileData = await response.json();
-            const driveModifiedTime = new Date(fileData.modifiedTime);
-
-            // If we have a last sync time and Drive file is newer, there's a conflict
-            if (this.lastSyncTime && driveModifiedTime > this.lastSyncTime) {
-                const timeDiff = Math.floor((driveModifiedTime - this.lastSyncTime) / 1000 / 60); // minutes
-
-                const userChoice = confirm(
-                    `⚠️ CONFLICT DETECTED\n\n` +
-                    `The Google Drive backup was modified ${timeDiff} minute(s) ago, ` +
-                    `which is AFTER your last sync.\n\n` +
-                    `This might mean:\n` +
-                    `• You made changes on another device\n` +
-                    `• Someone else modified the file\n\n` +
-                    `Click OK to LOAD the Drive version (recommended)\n` +
-                    `Click Cancel to OVERWRITE Drive with your local data (may lose changes!)`
-                );
-
-                if (userChoice) {
-                    // Load from Drive instead
-                    this.updateSyncStatus('info', 'Loading newer data from Drive...', 'fa-cloud-download-alt');
-                    await this.loadFromGoogleDrive();
-                    return true; // Conflict handled by loading
-                } else {
-                    // User chose to overwrite - proceed with sync
-                    this.updateSyncStatus('warning', 'Overwriting Drive data...', 'fa-exclamation-triangle');
-                    return false;
-                }
-            }
-
-            return false; // No conflict
-
-        } catch (error) {
-            console.error('Error checking for conflicts:', error);
-            return false; // Can't check, proceed with sync
-        }
-    }
-
-    async manualSync() {
-        try {
-            this.updateSyncStatus('info', 'Checking for changes...', 'fa-sync fa-spin');
-
-            // Request authentication
-            await this.requestAccessToken();
-
-            // Check if we have a file on Drive
-            const fileId = await this.findBackupFile();
-
-            if (!fileId) {
-                // No file on Drive, upload local data
-                this.updateSyncStatus('info', 'No Drive data found - uploading...', 'fa-upload');
-                await this.saveToGoogleDrive();
-                return;
-            }
-
-            // Get file metadata to check modified time
-            const fileResponse = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (!fileResponse.ok) {
-                throw new Error(`Failed to get file metadata: ${fileResponse.status}`);
-            }
-
-            const fileMetadata = await fileResponse.json();
-            const driveModifiedTime = new Date(fileMetadata.modifiedTime);
-
-            // Get last sync time from localStorage
-            const lastSyncTimeStr = localStorage.getItem('lastSyncTime');
-            const lastSyncTime = lastSyncTimeStr ? new Date(lastSyncTimeStr) : null;
-
-            // Download Drive data to compare
-            const dataResponse = await fetch(
-                `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
-                }
-            );
-
-            if (!dataResponse.ok) {
-                throw new Error(`Failed to download file: ${dataResponse.status}`);
-            }
-
-            const driveData = await dataResponse.json();
-
-            if (!driveData) {
-                this.updateSyncStatus('error', 'Failed to read Drive data', 'fa-exclamation-triangle');
-                return;
-            }
-
-            // Get local data from storage
-            const localData = window.gardenStorage.getData();
-
-            if (!localData) {
-                this.updateSyncStatus('error', 'Failed to read local data', 'fa-exclamation-triangle');
-                return;
-            }
-
-            // Calculate hashes to detect if data is different
-            const driveHash = this.simpleHash(JSON.stringify({
-                profile: driveData.profile,
-                dailyLogs: driveData.dailyLogs,
-                weedTracker: driveData.weedTracker,
-                harvestJournal: driveData.harvestJournal
-            }));
-
-            const localHash = this.simpleHash(JSON.stringify({
-                profile: localData.profile,
-                dailyLogs: localData.dailyLogs,
-                weedTracker: localData.weedTracker,
-                harvestJournal: localData.harvestJournal
-            }));
-
-            // If data is identical, nothing to do
-            if (driveHash === localHash) {
-                this.updateSyncStatus('success', 'Already in sync - no changes needed', 'fa-check');
-                return;
-            }
-
-            // Data is different - determine direction
-            if (!lastSyncTime) {
-                // Never synced before - we have a conflict
-                const userChoice = confirm(
-                    'Both local and Drive data exist but have never been synced.\n\n' +
-                    'Click OK to use Drive data (download)\n' +
-                    'Click Cancel to use local data (upload)'
-                );
-
-                if (userChoice) {
-                    // Download from Drive
-                    this.updateSyncStatus('info', 'Downloading from Drive...', 'fa-download');
-                    await this.loadFromDrive(driveData);
-                } else {
-                    // Upload to Drive
-                    this.updateSyncStatus('info', 'Uploading to Drive...', 'fa-upload');
-
-                    // Add export metadata to local data before uploading
-                    const stats = window.gardenStorage.calculateGrowthStats();
-                    const exportData = {
-                        ...localData,
-                        exportInfo: {
-                            exportDate: new Date().toISOString(),
-                            version: '1.0',
-                            appName: 'Inner Garden Tracker',
-                            exportMethod: 'Google Drive Sync',
-                            summary: {
-                                totalDailyLogs: Object.keys(localData.dailyLogs || {}).length,
-                                totalWeedEntries: Object.keys(localData.weedTracker || {}).length,
-                                currentStreak: stats.streak,
-                                daysSinceStart: stats.daysSinceStart,
-                                wellnessScore: stats.wellnessScore
-                            }
-                        }
-                    };
-
-                    await this.updateBackupFile(exportData);
-
-                    // Update last sync time after successful upload
-                    localStorage.setItem('lastSyncTime', new Date().toISOString());
-                    this.lastSyncedDataHash = localHash;
-                    this.updateSyncStatus('success', 'Uploaded to Drive successfully', 'fa-check');
-                }
-            } else if (driveModifiedTime > lastSyncTime) {
-                // Drive is newer - download
-                this.updateSyncStatus('info', 'Drive has newer data - downloading...', 'fa-download');
-                await this.loadFromDrive(driveData);
-            } else {
-                // Local is newer - upload
-                this.updateSyncStatus('info', 'Local data is newer - uploading...', 'fa-upload');
-
-                // Add export metadata to local data before uploading
-                const stats = window.gardenStorage.calculateGrowthStats();
-                const exportData = {
-                    ...localData,
-                    exportInfo: {
-                        exportDate: new Date().toISOString(),
-                        version: '1.0',
-                        appName: 'Inner Garden Tracker',
-                        exportMethod: 'Google Drive Sync',
-                        summary: {
-                            totalDailyLogs: Object.keys(localData.dailyLogs || {}).length,
-                            totalWeedEntries: Object.keys(localData.weedTracker || {}).length,
-                            currentStreak: stats.streak,
-                            daysSinceStart: stats.daysSinceStart,
-                            wellnessScore: stats.wellnessScore
-                        }
-                    }
-                };
-
-                await this.updateBackupFile(exportData);
-
-                // Update last sync time after successful upload
-                localStorage.setItem('lastSyncTime', new Date().toISOString());
-                this.lastSyncedDataHash = localHash;
-                this.updateSyncStatus('success', 'Uploaded to Drive successfully', 'fa-check');
-            }
-
-        } catch (error) {
-            console.error('Manual sync error:', error);
-            this.updateSyncStatus('error', 'Sync failed: ' + error.message, 'fa-exclamation-triangle');
-        }
-    }
-
-    async loadFromDrive(driveData) {
-        // Apply Drive data to local storage
-        const { exportInfo, ...cleanData } = driveData;
-
-        if (window.gardenStorage.saveData(cleanData)) {
-            // Update last sync time
-            localStorage.setItem('lastSyncTime', new Date().toISOString());
-
-            // Update cached hash
-            this.lastSyncedDataHash = this.simpleHash(JSON.stringify({
-                profile: cleanData.profile,
-                dailyLogs: cleanData.dailyLogs,
-                weedTracker: cleanData.weedTracker,
-                harvestJournal: cleanData.harvestJournal
-            }));
-
-            this.updateSyncStatus('success', 'Downloaded from Drive successfully', 'fa-check');
-
-            // Refresh the page to reflect downloaded data
-            setTimeout(() => {
-                location.reload();
-            }, 1000);
-        } else {
-            throw new Error('Failed to save Drive data locally');
-        }
-    }
-
-    handleOnline() {
-        this.isOnline = true;
-        console.log('Network connection restored');
-
-        if (this.autoSyncEnabled) {
-            this.updateSyncStatus('info', 'Back online - syncing...', 'fa-wifi');
-            // Trigger a sync now that we're back online
-            setTimeout(() => this.performAutoSync(), 2000);
-        }
-    }
-
-    handleOffline() {
-        this.isOnline = false;
-        console.log('Network connection lost');
-
-        if (this.autoSyncEnabled) {
-            this.updateSyncStatus('warning', 'Offline - will sync when connection restored', 'fa-wifi');
-        }
-    }
-
-    updateSyncStatus(type, message, icon) {
-        const statusDiv = document.getElementById('sync-status');
-        if (!statusDiv) return;
-
-        const colors = {
-            success: { bg: '#e8f5e9', text: '#27ae60' },
-            info: { bg: '#e3f2fd', text: '#2196f3' },
-            warning: { bg: '#fff3cd', text: '#ff9800' },
-            error: { bg: '#ffeaea', text: '#e74c3c' },
-            secondary: { bg: '#f8f9fa', text: '#6c757d' }
-        };
-
-        const color = colors[type] || colors.info;
-
-        statusDiv.style.background = color.bg;
-        statusDiv.style.color = color.text;
-        statusDiv.innerHTML = `<i class="fas ${icon}"></i><span>${message}</span>`;
     }
 }
 
@@ -1269,26 +458,12 @@ window.googleDriveSync = new GoogleDriveSync();
 
 // Initialize when Google API loads
 window.addEventListener('load', () => {
-    // Wait a bit for Google's script to load
     setTimeout(() => {
         if (window.google && window.google.accounts) {
             window.googleDriveSync.init();
-
-            // Restore auto-sync state from localStorage
-            const checkbox = document.getElementById('auto-sync-checkbox');
-            if (checkbox && window.googleDriveSync.autoSyncEnabled) {
-                checkbox.checked = true;
-                // Try to resume auto-sync (will ask for re-auth if needed)
-                window.googleDriveSync.updateSyncStatus('info', 'Auto-sync enabled - click "Sync Now" to connect', 'fa-info-circle');
-            }
-
-            // Restore auto-backup checkbox state
-            const backupCheckbox = document.getElementById('auto-backup-checkbox');
-            if (backupCheckbox) {
-                backupCheckbox.checked = window.googleDriveSync.autoBackupEnabled;
-            }
+            console.log('Google Drive Sync ready');
         } else {
-            console.warn('Google Identity Services not loaded');
+            console.warn('Google API not loaded - Drive sync unavailable');
         }
     }, 1000);
 });
