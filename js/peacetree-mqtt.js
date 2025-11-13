@@ -26,6 +26,13 @@ const PeaceTreeMQTT = {
         this.connectionAttempted = true;
 
         try {
+            // Skip connection if page is loaded over HTTPS and we're using insecure WebSocket
+            if (window.location.protocol === 'https:' && !this.config.useSSL) {
+                console.log('PeaceTree: Skipping MQTT connection - HTTPS page cannot connect to insecure WebSocket (ws://)');
+                console.log('PeaceTree: Mood lighting disabled for this session');
+                return;
+            }
+
             // Debug: Check what's available
             console.log('PeaceTree: Checking for Paho MQTT library...');
             console.log('PeaceTree: typeof Paho:', typeof Paho);
