@@ -99,6 +99,12 @@ class GardenStorage {
     saveData(data) {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(data));
+
+            // Trigger auto-sync if enabled
+            if (window.googleDriveSync && window.googleDriveSync.autoSyncEnabled) {
+                window.googleDriveSync.scheduleSync();
+            }
+
             return true;
         } catch (error) {
             console.error('Error saving garden data:', error);

@@ -234,6 +234,76 @@
                     <!-- Stats will be populated by JavaScript -->
                 </div>
             </div>
+
+            <!-- Google Drive Auto-Sync Settings -->
+            <div
+                style="background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1); margin-top: 25px;">
+                <h3 style="color: #4285f4; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                    <i class="fab fa-google-drive"></i> Google Drive Auto-Sync
+                </h3>
+                <div style="display: flex; flex-direction: column; gap: 15px;">
+                    <!-- Auto-Sync Toggle -->
+                    <div
+                        style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
+                            <input type="checkbox" id="auto-sync-checkbox"
+                                onchange="window.googleDriveSync.toggleAutoSync(this.checked)"
+                                style="width: 20px; height: 20px; cursor: pointer;">
+                            <span style="font-weight: 500; color: #2c3e50;">
+                                Enable Auto-Sync
+                            </span>
+                        </label>
+                        <button id="sync-now-btn" onclick="window.googleDriveSync.manualSync()"
+                            style="background: #4285f4; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s ease;"
+                            onmouseover="this.style.background='#3367d6'" onmouseout="this.style.background='#4285f4'">
+                            <i class="fas fa-sync-alt"></i> Sync Now
+                        </button>
+                    </div>
+
+                    <!-- Auto-Backup Toggle -->
+                    <div
+                        style="display: flex; align-items: center; gap: 15px; padding: 15px; background: #f8f9fa; border-radius: 10px;">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
+                            <input type="checkbox" id="auto-backup-checkbox"
+                                onchange="window.googleDriveSync.toggleAutoBackup(this.checked)"
+                                style="width: 20px; height: 20px; cursor: pointer;" checked>
+                            <span style="font-weight: 500; color: #2c3e50;">
+                                Create backup before sync
+                                <span id="backup-count"
+                                    style="color: #7f8c8d; font-weight: normal; font-size: 0.9em; margin-left: 8px;">
+                                    No backups yet
+                                </span>
+                            </span>
+                        </label>
+                        <button id="clear-backups-btn" onclick="window.googleDriveSync.clearAllBackups()"
+                            style="background: #e74c3c; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9rem; transition: all 0.3s ease;"
+                            onmouseover="this.style.background='#c0392b'" onmouseout="this.style.background='#e74c3c'">
+                            <i class="fas fa-trash"></i> Clear Backups
+                        </button>
+                    </div>
+
+                    <!-- Sync Status Indicator -->
+                    <div id="sync-status"
+                        style="padding: 12px; border-radius: 8px; font-size: 0.9rem; display: flex; align-items: center; gap: 10px; background: #e8f5e9; color: #27ae60;">
+                        <i class="fas fa-check-circle"></i>
+                        <span>Not connected - Click "Sync Now" or enable auto-sync to connect</span>
+                    </div>
+
+                    <!-- Auto-Sync Description -->
+                    <div
+                        style="padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107; border-radius: 5px; font-size: 0.9rem; color: #856404; line-height: 1.6;">
+                        <strong><i class="fas fa-info-circle"></i> How Auto-Sync Works:</strong>
+                        <ul style="margin: 10px 0 0 20px; padding: 0;">
+                            <li>Automatically saves changes to Google Drive every 5 minutes</li>
+                            <li>Backups created before each update (keeps 20 most recent)</li>
+                            <li>Checks for conflicts before syncing</li>
+                            <li>Works offline - syncs when connection restored</li>
+                            <li><strong>⚠️ Multi-Device Warning:</strong> Use on one device at a time to avoid data
+                                conflicts</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

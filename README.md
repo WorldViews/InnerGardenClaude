@@ -144,26 +144,54 @@ Comprehensive view of your journey:
 - **Statistics**: Word counts, entry analysis, growth metrics
 - **Search & Sort**: Find specific entries quickly
 
-### ☁️ **Google Drive Sync** (New!)
+### ☁️ **Google Drive Sync**
 Optionally sync your garden data to Google Drive:
-- **Save to Google Drive**: Backup your data to your personal Google Drive
-- **Load from Google Drive**: Restore data from your Drive backup
+- **Manual Sync**: One-click save/load to Google Drive
+- **Auto-Sync**: Automatically sync changes every 5 minutes
+- **Auto-Backup**: Creates timestamped backups before each sync (keeps 20 most recent)
+- **Conflict Detection**: Warns before overwriting newer data
+- **Offline Support**: Queues syncs when offline, resumes when back online
 - **Privacy First**: Only accesses files created by the app (not your entire Drive)
-- **One-Click Auth**: Simple Google login popup for authentication
-- **No Account Required**: Works without Google Drive if you prefer local-only storage
+- **Organized Storage**: Main file and backups in dedicated "InnerGarden" folder
 
-**How to Use:**
+**How to Use Manual Sync:**
 1. Click "Save to Google Drive" in the Data Management section
 2. Sign in with your Google account (one-time per session)
 3. Grant permission for the app to store files in your Drive
-4. Your data is automatically saved as `inner-garden-data.json`
+4. Your data is saved as `InnerGarden/inner-garden-data.json`
 5. Use "Load from Google Drive" to restore from any device
+
+**How to Use Auto-Sync:**
+1. Enable "Auto-Sync" checkbox in Data Management section
+2. Authenticate with Google Drive (one-time)
+3. Changes are automatically synced every 5 minutes
+4. Status indicator shows sync state (syncing, synced, offline, errors)
+5. Conflict detection prevents accidental data loss
+
+**Auto-Backup Feature:**
+- ✅ Enabled by default for safety
+- ✅ Creates backup before overwriting main file
+- ✅ Timestamped filenames (e.g., `inner-garden-backup-2025-11-13-14-30-45.json`)
+- ✅ Stored in `InnerGarden/backups/` folder
+- ✅ Automatically keeps only 20 most recent backups
+- ✅ "Clear Backups" button to delete all backups
+- ✅ Backups viewable/downloadable directly from Google Drive
+
+**Features:**
+- ✅ Debounced sync (waits 30 seconds after last change)
+- ✅ Automatic conflict detection with user prompt
+- ✅ Retry logic with exponential backoff
+- ✅ Online/offline detection
+- ✅ Visual sync status indicator
+- ✅ Safety net: recover from accidental overwrites
+- ⚠️ **Multi-Device Warning**: Use on one device at a time, or conflicts may occur
 
 **Privacy & Security:**
 - App only accesses its own files (using `drive.file` scope)
 - No server-side storage - direct browser-to-Google connection
 - You can revoke access anytime via Google account settings
-- Authentication tokens are never stored in localStorage
+- Authentication tokens stored in memory only (not localStorage)
+- Re-authentication required after token expiry (~1 hour)
 
 ## 🔧 Developer Guide
 
