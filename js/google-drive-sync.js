@@ -561,10 +561,18 @@ class GoogleDriveSync {
             if (existingFileId) {
                 // Update existing file
                 await this.updateBackupFile(exportData);
+
+                // Update last sync time
+                localStorage.setItem('lastSyncTime', new Date().toISOString());
+
                 window.showNotification('✅ Garden data updated in Google Drive!', 'success');
             } else {
                 // Create new file
                 await this.createBackupFile(exportData);
+
+                // Update last sync time
+                localStorage.setItem('lastSyncTime', new Date().toISOString());
+
                 window.showNotification('✅ Garden data saved to Google Drive!', 'success');
             }
 
@@ -634,6 +642,9 @@ class GoogleDriveSync {
 
             // Save the imported data
             if (window.gardenStorage.saveData(cleanData)) {
+                // Update last sync time
+                localStorage.setItem('lastSyncTime', new Date().toISOString());
+
                 window.showNotification('✅ Garden data loaded from Google Drive! Refreshing...', 'success');
 
                 // Refresh the page to reflect imported data
@@ -906,6 +917,10 @@ class GoogleDriveSync {
             // Update hash after successful sync
             this.lastSyncedDataHash = currentDataHash;
             this.lastSyncTime = new Date();
+
+            // Save last sync time to localStorage
+            localStorage.setItem('lastSyncTime', this.lastSyncTime.toISOString());
+
             this.syncRetryCount = 0;
 
             const timeStr = this.lastSyncTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1043,7 +1058,10 @@ class GoogleDriveSync {
 
             const fileMetadata = await fileResponse.json();
             const driveModifiedTime = new Date(fileMetadata.modifiedTime);
-            const lastSyncTime = this.getLastSyncTime();
+
+            // Get last sync time from localStorage
+            const lastSyncTimeStr = localStorage.getItem('lastSyncTime');
+            const lastSyncTime = lastSyncTimeStr ? new Date(lastSyncTimeStr) : null;
 
             // Download Drive data to compare
             const dataResponse = await fetch(
@@ -1066,7 +1084,13 @@ class GoogleDriveSync {
                 return;
             }
 
-            const localData = this.getDataToSync();
+            // Get local data from storage
+            const localData = window.gardenStorage.getData();
+
+            if (!localData) {
+                this.updateSyncStatus('error', 'Failed to read local data', 'fa-exclamation-triangle');
+                return;
+            }
 
             // Calculate hashes to detect if data is different
             const driveHash = this.simpleHash(JSON.stringify({
@@ -1105,10 +1129,32 @@ class GoogleDriveSync {
                 } else {
                     // Upload to Drive
                     this.updateSyncStatus('info', 'Uploading to Drive...', 'fa-upload');
-                    if (this.autoBackupEnabled) {
-                        await this.createBackup(fileId);
-                    }
-                    await this.updateBackupFile(fileId);
+
+                    // Add export metadata to local data before uploading
+                    const stats = window.gardenStorage.calculateGrowthStats();
+                    const exportData = {
+                        ...localData,
+                        exportInfo: {
+                            exportDate: new Date().toISOString(),
+                            version: '1.0',
+                            appName: 'Inner Garden Tracker',
+                            exportMethod: 'Google Drive Sync',
+                            summary: {
+                                totalDailyLogs: Object.keys(localData.dailyLogs || {}).length,
+                                totalWeedEntries: Object.keys(localData.weedTracker || {}).length,
+                                currentStreak: stats.streak,
+                                daysSinceStart: stats.daysSinceStart,
+                                wellnessScore: stats.wellnessScore
+                            }
+                        }
+                    };
+
+                    await this.updateBackupFile(exportData);
+
+                    // Update last sync time after successful upload
+                    localStorage.setItem('lastSyncTime', new Date().toISOString());
+                    this.lastSyncedDataHash = localHash;
+                    this.updateSyncStatus('success', 'Uploaded to Drive successfully', 'fa-check');
                 }
             } else if (driveModifiedTime > lastSyncTime) {
                 // Drive is newer - download
@@ -1117,10 +1163,32 @@ class GoogleDriveSync {
             } else {
                 // Local is newer - upload
                 this.updateSyncStatus('info', 'Local data is newer - uploading...', 'fa-upload');
-                if (this.autoBackupEnabled) {
-                    await this.createBackup(fileId);
-                }
-                await this.updateBackupFile(fileId);
+
+                // Add export metadata to local data before uploading
+                const stats = window.gardenStorage.calculateGrowthStats();
+                const exportData = {
+                    ...localData,
+                    exportInfo: {
+                        exportDate: new Date().toISOString(),
+                        version: '1.0',
+                        appName: 'Inner Garden Tracker',
+                        exportMethod: 'Google Drive Sync',
+                        summary: {
+                            totalDailyLogs: Object.keys(localData.dailyLogs || {}).length,
+                            totalWeedEntries: Object.keys(localData.weedTracker || {}).length,
+                            currentStreak: stats.streak,
+                            daysSinceStart: stats.daysSinceStart,
+                            wellnessScore: stats.wellnessScore
+                        }
+                    }
+                };
+
+                await this.updateBackupFile(exportData);
+
+                // Update last sync time after successful upload
+                localStorage.setItem('lastSyncTime', new Date().toISOString());
+                this.lastSyncedDataHash = localHash;
+                this.updateSyncStatus('success', 'Uploaded to Drive successfully', 'fa-check');
             }
 
         } catch (error) {
