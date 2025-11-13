@@ -1014,30 +1014,60 @@ class GoogleDriveSync {
         try {
             this.updateSyncStatus('info', 'Checking for changes...', 'fa-sync fa-spin');
 
+            // Request authentication
+            await this.requestAccessToken();
+
             // Check if we have a file on Drive
-            const files = await this.listFiles();
-            
-            if (files.length === 0) {
+            const fileId = await this.findBackupFile();
+
+            if (!fileId) {
                 // No file on Drive, upload local data
                 this.updateSyncStatus('info', 'No Drive data found - uploading...', 'fa-upload');
                 await this.saveToGoogleDrive();
                 return;
             }
 
-            const driveFile = files[0];
-            const driveModifiedTime = new Date(driveFile.modifiedTime);
+            // Get file metadata to check modified time
+            const fileResponse = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${fileId}?fields=modifiedTime`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`
+                    }
+                }
+            );
+
+            if (!fileResponse.ok) {
+                throw new Error(`Failed to get file metadata: ${fileResponse.status}`);
+            }
+
+            const fileMetadata = await fileResponse.json();
+            const driveModifiedTime = new Date(fileMetadata.modifiedTime);
             const lastSyncTime = this.getLastSyncTime();
 
             // Download Drive data to compare
-            const driveData = await this.downloadFile(driveFile.id);
-            
+            const dataResponse = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${this.accessToken}`
+                    }
+                }
+            );
+
+            if (!dataResponse.ok) {
+                throw new Error(`Failed to download file: ${dataResponse.status}`);
+            }
+
+            const driveData = await dataResponse.json();
+
             if (!driveData) {
                 this.updateSyncStatus('error', 'Failed to read Drive data', 'fa-exclamation-triangle');
                 return;
             }
 
             const localData = this.getDataToSync();
-            
+
             // Calculate hashes to detect if data is different
             const driveHash = this.simpleHash(JSON.stringify({
                 profile: driveData.profile,
@@ -1045,7 +1075,7 @@ class GoogleDriveSync {
                 weedTracker: driveData.weedTracker,
                 harvestJournal: driveData.harvestJournal
             }));
-            
+
             const localHash = this.simpleHash(JSON.stringify({
                 profile: localData.profile,
                 dailyLogs: localData.dailyLogs,
@@ -1067,7 +1097,7 @@ class GoogleDriveSync {
                     'Click OK to use Drive data (download)\n' +
                     'Click Cancel to use local data (upload)'
                 );
-                
+
                 if (userChoice) {
                     // Download from Drive
                     this.updateSyncStatus('info', 'Downloading from Drive...', 'fa-download');
@@ -1076,9 +1106,9 @@ class GoogleDriveSync {
                     // Upload to Drive
                     this.updateSyncStatus('info', 'Uploading to Drive...', 'fa-upload');
                     if (this.autoBackupEnabled) {
-                        await this.createBackup(driveFile.id);
+                        await this.createBackup(fileId);
                     }
-                    await this.updateBackupFile(driveFile.id);
+                    await this.updateBackupFile(fileId);
                 }
             } else if (driveModifiedTime > lastSyncTime) {
                 // Drive is newer - download
@@ -1088,9 +1118,9 @@ class GoogleDriveSync {
                 // Local is newer - upload
                 this.updateSyncStatus('info', 'Local data is newer - uploading...', 'fa-upload');
                 if (this.autoBackupEnabled) {
-                    await this.createBackup(driveFile.id);
+                    await this.createBackup(fileId);
                 }
-                await this.updateBackupFile(driveFile.id);
+                await this.updateBackupFile(fileId);
             }
 
         } catch (error) {
@@ -1102,11 +1132,11 @@ class GoogleDriveSync {
     async loadFromDrive(driveData) {
         // Apply Drive data to local storage
         const { exportInfo, ...cleanData } = driveData;
-        
+
         if (window.gardenStorage.saveData(cleanData)) {
             // Update last sync time
             localStorage.setItem('lastSyncTime', new Date().toISOString());
-            
+
             // Update cached hash
             this.lastSyncedDataHash = this.simpleHash(JSON.stringify({
                 profile: cleanData.profile,
@@ -1114,9 +1144,9 @@ class GoogleDriveSync {
                 weedTracker: cleanData.weedTracker,
                 harvestJournal: cleanData.harvestJournal
             }));
-            
+
             this.updateSyncStatus('success', 'Downloaded from Drive successfully', 'fa-check');
-            
+
             // Refresh the page to reflect downloaded data
             setTimeout(() => {
                 location.reload();
