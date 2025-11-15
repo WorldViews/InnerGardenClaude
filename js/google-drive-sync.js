@@ -468,13 +468,13 @@ class GoogleDriveSync {
         if (!localData) return false;
 
         const currentModified = localData.lastModified;
-        
+
         // If no sync has happened yet, consider it as having unsaved changes
         if (!this.lastSyncTime) return true;
-        
+
         // If no lastModified timestamp, no changes
         if (!currentModified) return false;
-        
+
         // Compare current lastModified with what we had at last sync
         return currentModified !== this.lastLocalModified;
     }

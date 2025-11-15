@@ -18,20 +18,26 @@ const DailyLogPage = {
 
         Object.entries(dailyLogs).forEach(([date, log]) => {
             const correctTimestamp = new Date(date + 'T12:00:00').toISOString();
-            let needsUpdate = false;
+            let actuallyChanged = false;
 
             // Fix main log timestamp if it doesn't match the date
-            if (!log.timestamp || !this.isTimestampCorrectForDate(log.timestamp, date)) {
+            if (log.timestamp && this.isTimestampCorrectForDate(log.timestamp, date)) {
+                // Timestamp exists and is already correct - do nothing
+            } else if (log.timestamp !== correctTimestamp) {
+                // Timestamp is missing or incorrect AND different from what we'd set
                 log.timestamp = correctTimestamp;
-                needsUpdate = true;
+                actuallyChanged = true;
             }
 
             // Fix seeds timestamps
             if (log.seeds) {
                 log.seeds.forEach(seed => {
-                    if (!seed.timestamp || !this.isTimestampCorrectForDate(seed.timestamp, date)) {
+                    if (seed.timestamp && this.isTimestampCorrectForDate(seed.timestamp, date)) {
+                        // Timestamp exists and is already correct - do nothing
+                    } else if (seed.timestamp !== correctTimestamp) {
+                        // Timestamp is missing or incorrect AND different from what we'd set
                         seed.timestamp = correctTimestamp;
-                        needsUpdate = true;
+                        actuallyChanged = true;
                     }
                 });
             }
@@ -39,14 +45,17 @@ const DailyLogPage = {
             // Fix gratitude timestamps
             if (log.gratitude) {
                 log.gratitude.forEach(gratitude => {
-                    if (!gratitude.timestamp || !this.isTimestampCorrectForDate(gratitude.timestamp, date)) {
+                    if (gratitude.timestamp && this.isTimestampCorrectForDate(gratitude.timestamp, date)) {
+                        // Timestamp exists and is already correct - do nothing
+                    } else if (gratitude.timestamp !== correctTimestamp) {
+                        // Timestamp is missing or incorrect AND different from what we'd set
                         gratitude.timestamp = correctTimestamp;
-                        needsUpdate = true;
+                        actuallyChanged = true;
                     }
                 });
             }
 
-            if (needsUpdate) {
+            if (actuallyChanged) {
                 window.gardenStorage.saveDailyLog(date, log);
                 fixedAny = true;
             }

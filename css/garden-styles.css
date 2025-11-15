@@ -271,10 +271,13 @@ body {
 }
 
 @keyframes pulse-sync {
-    0%, 100% {
+
+    0%,
+    100% {
         transform: scale(1);
         box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
     }
+
     50% {
         transform: scale(1.05);
         box-shadow: 0 8px 20px rgba(243, 156, 18, 0.5);

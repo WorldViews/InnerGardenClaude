@@ -128,8 +128,8 @@ class GardenStorage {
     saveDailyLog(date, logData) {
         const dailyLogs = this.getSection('dailyLogs') || {};
         dailyLogs[date] = {
-            ...logData,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(), // Default timestamp
+            ...logData // Spread logData after, so it can override timestamp if present
         };
         return this.saveSection('dailyLogs', dailyLogs);
     }
