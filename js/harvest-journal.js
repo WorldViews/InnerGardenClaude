@@ -92,6 +92,31 @@ const HarvestJournalPage = {
                     </div>
                 </div>
             </div>
+
+            <!-- Progress Update Modal -->
+            <div id="progress-modal" class="modal" style="display: none;">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3><i class="fas fa-seedling"></i> Add Progress Update</h3>
+                        <button class="modal-close" onclick="HarvestJournalPage.closeProgressModal()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="progress-seed-name" style="margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px; font-weight: 500;"></div>
+                        <label>Progress Note:</label>
+                        <textarea id="progress-note" rows="4" placeholder="What progress did you make? Any insights or challenges?"></textarea>
+                    </div>
+                    <div class="modal-footer">
+                        <button class="btn-secondary" onclick="HarvestJournalPage.closeProgressModal()">
+                            Cancel
+                        </button>
+                        <button class="btn-primary" onclick="HarvestJournalPage.saveProgress()">
+                            <i class="fas fa-plus"></i> Add Update
+                        </button>
+                    </div>
+                </div>
+            </div>
         `;
     },
 
@@ -173,36 +198,56 @@ const HarvestJournalPage = {
             return;
         }
 
-        container.innerHTML = seeds.map(seed => `
-            <div class="seed-card growing" data-seed-id="${seed.id}" data-date="${seed.originalDate}">
-                <div class="seed-card-header">
-                    <div class="seed-info">
-                        <div class="seed-text">${this.escapeHTML(seed.text)}</div>
-                        <div class="seed-meta">
-                            <span class="seed-date">
-                                <i class="fas fa-calendar"></i> 
-                                Planted ${this.formatDate(seed.originalDate)}
-                            </span>
-                            <span class="seed-age">
-                                <i class="fas fa-clock"></i> 
-                                ${seed.daysGrowing} ${seed.daysGrowing === 1 ? 'day' : 'days'} growing
-                            </span>
+        container.innerHTML = seeds.map(seed => {
+            const updatesHtml = seed.updates && seed.updates.length > 0 ? `
+                <div class="seed-updates">
+                    <div class="updates-header">
+                        <i class="fas fa-chart-line"></i> Progress Updates (${seed.updates.length})
+                    </div>
+                    ${seed.updates.slice().reverse().map(update => `
+                        <div class="update-item">
+                            <div class="update-date">${this.formatDate(update.date)}</div>
+                            <div class="update-note">${this.escapeHTML(update.note)}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            ` : '';
+
+            return `
+                <div class="seed-card growing" data-seed-id="${seed.id}" data-date="${seed.originalDate}">
+                    <div class="seed-card-header">
+                        <div class="seed-info">
+                            <div class="seed-text">${this.escapeHTML(seed.text)}</div>
+                            <div class="seed-meta">
+                                <span class="seed-date">
+                                    <i class="fas fa-calendar"></i> 
+                                    Planted ${this.formatDate(seed.originalDate)}
+                                </span>
+                                <span class="seed-age">
+                                    <i class="fas fa-clock"></i> 
+                                    ${seed.daysGrowing} ${seed.daysGrowing === 1 ? 'day' : 'days'} growing
+                                </span>
+                            </div>
+                            ${updatesHtml}
+                        </div>
+                        <div class="seed-actions">
+                            <button class="btn-progress" onclick="HarvestJournalPage.addProgress(${seed.id}, '${seed.originalDate}')" title="Add progress update">
+                                <i class="fas fa-plus-circle"></i> Progress
+                            </button>
+                            <button class="btn-harvest" onclick="HarvestJournalPage.harvestSeed(${seed.id}, '${seed.originalDate}')" title="Mark as completed">
+                                <i class="fas fa-check-circle"></i> Harvest
+                            </button>
+                            <button class="btn-icon" onclick="HarvestJournalPage.editSeed(${seed.id}, '${seed.originalDate}')" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="btn-icon btn-delete" onclick="HarvestJournalPage.deleteSeed(${seed.id}, '${seed.originalDate}')" title="Delete">
+                                <i class="fas fa-trash"></i>
+                            </button>
                         </div>
                     </div>
-                    <div class="seed-actions">
-                        <button class="btn-harvest" onclick="HarvestJournalPage.harvestSeed(${seed.id}, '${seed.originalDate}')" title="Mark as completed">
-                            <i class="fas fa-check-circle"></i> Harvest
-                        </button>
-                        <button class="btn-icon" onclick="HarvestJournalPage.editSeed(${seed.id}, '${seed.originalDate}')" title="Edit">
-                            <i class="fas fa-edit"></i>
-                        </button>
-                        <button class="btn-icon btn-delete" onclick="HarvestJournalPage.deleteSeed(${seed.id}, '${seed.originalDate}')" title="Delete">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
                 </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     },
 
     renderHarvestedGoals(goals) {
@@ -411,15 +456,37 @@ const HarvestJournalPage = {
     },
 
     deleteSeed(seedId, originalDate) {
-        if (!confirm('Are you sure you want to delete this goal? This cannot be undone.')) {
-            return;
-        }
-
         const data = window.gardenStorage.getData();
         const dailyLog = data.dailyLogs[originalDate];
 
         if (!dailyLog || !dailyLog.seeds) {
             window.showNotification('Error: Could not find seed', 'error');
+            return;
+        }
+
+        const seed = dailyLog.seeds.find(s => s.id === seedId);
+        if (!seed) {
+            window.showNotification('Error: Could not find seed', 'error');
+            return;
+        }
+
+        // Build detailed confirmation message
+        const daysGrowing = this.calculateDaysGrowing(originalDate);
+        const hasUpdates = seed.updates && seed.updates.length > 0;
+
+        let confirmMsg = `⚠️ DELETE GOAL?\n\n`;
+        confirmMsg += `"${seed.text}"\n\n`;
+        confirmMsg += `📅 Growing for ${daysGrowing} ${daysGrowing === 1 ? 'day' : 'days'}\n`;
+
+        if (hasUpdates) {
+            confirmMsg += `📝 Has ${seed.updates.length} progress ${seed.updates.length === 1 ? 'update' : 'updates'}\n`;
+        }
+
+        confirmMsg += `\n❌ This action CANNOT be undone.\n`;
+        confirmMsg += `All progress updates will be permanently lost.\n\n`;
+        confirmMsg += `Are you sure you want to delete this goal?`;
+
+        if (!confirm(confirmMsg)) {
             return;
         }
 
@@ -455,6 +522,91 @@ const HarvestJournalPage = {
             }
         } else {
             window.showNotification('Error removing harvest', 'error');
+        }
+    },
+
+    // Progress Update Methods
+    addProgress(seedId, originalDate) {
+        const data = window.gardenStorage.getData();
+        const dailyLog = data.dailyLogs[originalDate];
+
+        if (!dailyLog || !dailyLog.seeds) {
+            window.showNotification('Error: Could not find seed', 'error');
+            return;
+        }
+
+        const seed = dailyLog.seeds.find(s => s.id === seedId);
+        if (!seed) {
+            window.showNotification('Error: Could not find seed', 'error');
+            return;
+        }
+
+        // Store context for saving
+        this.progressContext = {
+            seedId: seedId,
+            originalDate: originalDate
+        };
+
+        // Show seed name in modal
+        document.getElementById('progress-seed-name').textContent = `📌 ${seed.text}`;
+        document.getElementById('progress-note').value = '';
+
+        // Show modal
+        document.getElementById('progress-modal').style.display = 'flex';
+        document.getElementById('progress-note').focus();
+    },
+
+    closeProgressModal() {
+        document.getElementById('progress-modal').style.display = 'none';
+        this.progressContext = null;
+    },
+
+    saveProgress() {
+        const note = document.getElementById('progress-note').value.trim();
+
+        if (!note) {
+            window.showNotification('Please enter a progress note', 'error');
+            return;
+        }
+
+        if (!this.progressContext) {
+            window.showNotification('Error: Invalid context', 'error');
+            return;
+        }
+
+        const data = window.gardenStorage.getData();
+        const dailyLog = data.dailyLogs[this.progressContext.originalDate];
+
+        if (!dailyLog || !dailyLog.seeds) {
+            window.showNotification('Error: Could not find seed', 'error');
+            return;
+        }
+
+        const seedIndex = dailyLog.seeds.findIndex(s => s.id === this.progressContext.seedId);
+        if (seedIndex === -1) {
+            window.showNotification('Error: Could not find seed', 'error');
+            return;
+        }
+
+        // Initialize updates array if it doesn't exist
+        if (!dailyLog.seeds[seedIndex].updates) {
+            dailyLog.seeds[seedIndex].updates = [];
+        }
+
+        // Add new progress update
+        dailyLog.seeds[seedIndex].updates.push({
+            date: new Date().toLocaleDateString('en-CA'),
+            note: note,
+            timestamp: new Date().toISOString()
+        });
+
+        // Save updated log
+        if (window.gardenStorage.saveDailyLog(this.progressContext.originalDate, dailyLog)) {
+            window.showNotification('✅ Progress update added!', 'success');
+            this.closeProgressModal();
+            this.loadSeeds();
+        } else {
+            window.showNotification('Error saving progress', 'error');
         }
     }
 };

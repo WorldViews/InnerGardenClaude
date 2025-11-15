@@ -526,6 +526,43 @@ const DailyLogPage = {
     },
 
     removeSeed(seedId) {
+        // Get the seed data to check for updates
+        const logData = window.gardenStorage.getDailyLog(this.currentDate);
+        if (!logData || !logData.seeds) return;
+
+        const seed = logData.seeds.find(s => s.id === seedId);
+        if (!seed) return;
+
+        // Calculate days growing
+        const plantedDate = new Date(this.currentDate + 'T12:00:00');
+        const today = new Date();
+        const daysGrowing = Math.ceil((today - plantedDate) / (1000 * 60 * 60 * 24));
+        const hasUpdates = seed.updates && seed.updates.length > 0;
+
+        // Build detailed confirmation message
+        let confirmMsg = `⚠️ DELETE GOAL?\n\n`;
+        confirmMsg += `"${seed.text}"\n\n`;
+
+        if (daysGrowing > 0) {
+            confirmMsg += `📅 Growing for ${daysGrowing} ${daysGrowing === 1 ? 'day' : 'days'}\n`;
+        }
+
+        if (hasUpdates) {
+            confirmMsg += `📝 Has ${seed.updates.length} progress ${seed.updates.length === 1 ? 'update' : 'updates'}\n`;
+        }
+
+        confirmMsg += `\n❌ This action CANNOT be undone.\n`;
+
+        if (hasUpdates) {
+            confirmMsg += `All progress updates will be permanently lost.\n`;
+        }
+
+        confirmMsg += `\nAre you sure you want to delete this goal?`;
+
+        if (!confirm(confirmMsg)) {
+            return;
+        }
+
         const seedElement = document.querySelector(`[data-seed-id="${seedId}"]`);
         if (seedElement) {
             seedElement.remove();
