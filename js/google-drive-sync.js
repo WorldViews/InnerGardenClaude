@@ -13,6 +13,8 @@ class GoogleDriveSync {
         this.driveFolderId = null;
         this.driveFileId = null;
         this.isInitialized = false;
+        this.lastSyncTime = null;
+        this.lastLocalModified = null;
     }
 
     // Initialize Google Identity Services
@@ -282,6 +284,7 @@ class GoogleDriveSync {
                 console.log('No Drive file found - uploading local data');
                 const dataToUpload = this.addTimestamp(localData);
                 await this.uploadToDrive(dataToUpload);
+                this.markAsSynced();
                 window.showNotification('✅ Uploaded to Google Drive', 'success');
                 return;
             }
@@ -300,6 +303,7 @@ class GoogleDriveSync {
             if (localHash === driveHash) {
                 // Data is identical
                 console.log('Data is identical - no sync needed');
+                this.markAsSynced();
                 window.showNotification('✅ Already in sync', 'success');
                 return;
             }
@@ -316,10 +320,12 @@ class GoogleDriveSync {
                 if (choice) {
                     // Download from Drive
                     await this.downloadAndApply(driveData);
+                    this.markAsSynced();
                 } else {
                     // Upload to Drive
                     const dataToUpload = this.addTimestamp(localData);
                     await this.updateFileInDrive(fileId, dataToUpload);
+                    this.markAsSynced();
                     window.showNotification('✅ Uploaded to Google Drive', 'success');
                 }
             } else if (!driveTimestamp || (localTimestamp && localTimestamp > driveTimestamp)) {
@@ -327,11 +333,13 @@ class GoogleDriveSync {
                 console.log('Local data is newer - uploading');
                 const dataToUpload = this.addTimestamp(localData);
                 await this.updateFileInDrive(fileId, dataToUpload);
+                this.markAsSynced();
                 window.showNotification('✅ Uploaded newer data to Drive', 'success');
             } else if (!localTimestamp || driveTimestamp > localTimestamp) {
                 // Drive is newer - download
                 console.log('Drive data is newer - downloading');
                 await this.downloadAndApply(driveData);
+                this.markAsSynced();
             } else {
                 // Timestamps equal but data differs - conflict
                 // Try to determine which has more data
@@ -357,9 +365,11 @@ class GoogleDriveSync {
 
                 if (choice) {
                     await this.downloadAndApply(driveData);
+                    this.markAsSynced();
                 } else {
                     const dataToUpload = this.addTimestamp(localData);
                     await this.updateFileInDrive(fileId, dataToUpload);
+                    this.markAsSynced();
                     window.showNotification('✅ Uploaded to Google Drive', 'success');
                 }
             }
@@ -451,6 +461,47 @@ class GoogleDriveSync {
             window.showNotification('❌ Load failed: ' + error.message, 'error');
         }
     }
+
+    // Check if there are unsaved changes
+    hasUnsavedChanges() {
+        const localData = window.gardenStorage.getData();
+        if (!localData) return false;
+
+        const currentModified = localData.lastModified;
+        
+        // If no sync has happened yet, consider it as having unsaved changes
+        if (!this.lastSyncTime) return true;
+        
+        // If no lastModified timestamp, no changes
+        if (!currentModified) return false;
+        
+        // Compare current lastModified with what we had at last sync
+        return currentModified !== this.lastLocalModified;
+    }
+
+    // Update sync button appearance
+    updateSyncButton() {
+        const syncBtn = document.getElementById('quick-sync-btn');
+        if (!syncBtn) return;
+
+        if (this.hasUnsavedChanges()) {
+            syncBtn.classList.add('unsaved-changes');
+            syncBtn.title = 'Sync with Google Drive (unsaved changes)';
+        } else {
+            syncBtn.classList.remove('unsaved-changes');
+            syncBtn.title = 'Sync with Google Drive';
+        }
+    }
+
+    // Mark data as synced (call after successful sync)
+    markAsSynced() {
+        const localData = window.gardenStorage.getData();
+        if (localData) {
+            this.lastLocalModified = localData.lastModified;
+            this.lastSyncTime = new Date().toISOString();
+        }
+        this.updateSyncButton();
+    }
 }
 
 // Create global instance
@@ -465,5 +516,10 @@ window.addEventListener('load', () => {
         } else {
             console.warn('Google API not loaded - Drive sync unavailable');
         }
+        // Update button state on load
+        if (window.googleDriveSync) {
+            window.googleDriveSync.updateSyncButton();
+        }
     }, 1000);
+
 });

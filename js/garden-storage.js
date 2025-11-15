@@ -99,6 +99,10 @@ class GardenStorage {
     saveData(data) {
         try {
             localStorage.setItem(this.storageKey, JSON.stringify(data));
+            // Update sync button if available
+            if (window.googleDriveSync && window.googleDriveSync.updateSyncButton) {
+                window.googleDriveSync.updateSyncButton();
+            }
             return true;
         } catch (error) {
             console.error('Error saving garden data:', error);

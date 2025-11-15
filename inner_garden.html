@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inner Garden Tracker 🌱</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link href="css/garden-styles.css?v=2" rel="stylesheet">
+    <link href="css/garden-styles.css?v=3" rel="stylesheet">
 
     <!-- Google Identity Services -->
     <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -276,6 +276,9 @@
         </button>
         <button class="quick-btn quick-journal" onclick="showPage('complete-journal')" title="Complete Journal">
             <i class="fas fa-book-open"></i>
+        </button>
+        <button id="quick-sync-btn" class="quick-btn quick-sync" onclick="window.googleDriveSync.sync()" title="Sync with Google Drive">
+            <i class="fas fa-sync-alt"></i>
         </button>
     </div>
 

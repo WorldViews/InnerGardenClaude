@@ -260,6 +260,27 @@ body {
     background: #a569bd;
 }
 
+.quick-sync {
+    background: #16a085;
+    position: relative;
+}
+
+.quick-sync.unsaved-changes {
+    background: #f39c12;
+    animation: pulse-sync 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-sync {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 8px 20px rgba(243, 156, 18, 0.5);
+    }
+}
+
 /* ===============================
    UTILITY CLASSES
    =============================== */
