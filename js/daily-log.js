@@ -121,6 +121,7 @@ const DailyLogPage = {
                                 <div class="tag-group">
                                     <span class="weather-tag" data-weather="sunny">☀️ Sunny</span>
                                     <span class="weather-tag" data-weather="cloudy">☁️ Cloudy</span>
+                                    <span class="weather-tag" data-weather="rainy">🌧️ Rainy</span>
                                     <span class="weather-tag" data-weather="stormy">⛈️ Stormy</span>
                                     <span class="weather-tag" data-weather="foggy">🌫️ Foggy</span>
                                     <span class="weather-tag" data-weather="windy">💨 Windy</span>
@@ -321,27 +322,43 @@ const DailyLogPage = {
         });
 
         // Clear observations
-        document.getElementById('observations').value = '';
+        const observationsField = document.getElementById('observations');
+        if (observationsField) {
+            observationsField.value = '';
+        }
 
         // Clear seeds list
-        document.getElementById('seeds-list').innerHTML = '';
+        const seedsList = document.getElementById('seeds-list');
+        if (seedsList) {
+            seedsList.innerHTML = '';
+        }
 
         // Clear gratitude list
-        document.getElementById('gratitude-list').innerHTML = '';
-
-        // Clear wisdom list
-        document.getElementById('wisdom-list').innerHTML = '';
+        const gratitudeList = document.getElementById('gratitude-list');
+        if (gratitudeList) {
+            gratitudeList.innerHTML = '';
+        }
 
         // Clear input fields
-        document.getElementById('new-seed').value = '';
-        document.getElementById('new-gratitude').value = '';
+        const newSeedInput = document.getElementById('new-seed');
+        if (newSeedInput) {
+            newSeedInput.value = '';
+        }
+
+        const newGratitudeInput = document.getElementById('new-gratitude');
+        if (newGratitudeInput) {
+            newGratitudeInput.value = '';
+        }
 
         // Reset add button in case it was in edit mode
         this.resetAddButton();
     },
 
     updateDateDisplay() {
-        document.getElementById('day-of-week').textContent = this.getDayOfWeek(this.currentDate);
+        const dayOfWeekElement = document.getElementById('day-of-week');
+        if (dayOfWeekElement) {
+            dayOfWeekElement.textContent = this.getDayOfWeek(this.currentDate);
+        }
         // Note: save-date-display element no longer exists since we removed the save button
     },
 
@@ -484,7 +501,7 @@ const DailyLogPage = {
 
     getWeatherEmoji(weather) {
         const emojis = {
-            sunny: '☀️', cloudy: '☁️', stormy: '⛈️',
+            sunny: '☀️', cloudy: '☁️', rainy: '🌧️', stormy: '⛈️',
             foggy: '🌫️', windy: '💨', calm: '🌅'
         };
         return emojis[weather] || '🌤️';
